@@ -1,5 +1,5 @@
 /*
- * Joget Skin — builder.css  (v1.3.0)
+ * Joget Skin — builder.css  (v1.3.1)
  * Target: Joget DX 9 (verified on DX Enterprise 9.1.2.2, build ee559cd).
  * Applies to /jw/web/console/*  (App Composer, Form / List / UI / Process Builder, web console).
  * The builder canvas iframe (/jw/builder/blank.jsp) is NOT matched on purpose.
@@ -94,9 +94,11 @@ html.joget-skin #builders .builder-type ul > li.jskin-group-header {
   align-items: center;
   gap: 6px;
   min-height: 0;
-  margin: 14px 0 4px;
-  padding: 0 2px;
+  margin: 16px 0 6px;
+  padding: 0 2px 4px;
   border: 0;
+  border-bottom: 1px solid #ddd;            /* group underline (Joget-native muted grey) */
+  border-radius: 0;
   background: transparent;
   color: #888;
   font-size: 12px;

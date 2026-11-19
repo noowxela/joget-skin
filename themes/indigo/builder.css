@@ -436,5 +436,8 @@ html.joget-skin.joget-skin-theme-indigo body.webconsole table tbody tr:hover td 
 html.joget-skin.joget-skin-theme-indigo body.webconsole #main-body .row-content a:not(.smallbutton):not(.btn) { color: var(--js-accent); }
 
 /* Composer group headers (v1.3 layout) in theme colours */
-html.joget-skin.joget-skin-theme-indigo #builders .builder-type ul > li.jskin-group-header { color: var(--js-muted); }
+html.joget-skin.joget-skin-theme-indigo #builders .builder-type ul > li.jskin-group-header {
+  color: var(--js-muted);
+  border-bottom-color: rgba(79, 70, 229, 0.18) !important;   /* light indigo tint */
+}
 html.joget-skin.joget-skin-theme-indigo #builders .builder-type ul > li.jskin-group-header .jskin-group-count { color: var(--js-muted); }
