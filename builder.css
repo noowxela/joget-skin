@@ -1,5 +1,5 @@
 /*
- * Joget Skin — builder.css  (v1.3.1)
+ * Joget Skin — builder.css  (v1.3.2)
  * Target: Joget DX 9 (verified on DX Enterprise 9.1.2.2, build ee559cd).
  * Applies to /jw/web/console/*  (App Composer, Form / List / UI / Process Builder, web console).
  * The builder canvas iframe (/jw/builder/blank.jsp) is NOT matched on purpose.
@@ -117,6 +117,58 @@ html.joget-skin #builders .builder-type ul > li.jskin-group-header.jskin-group-e
 /* the table name is now in the header, so the per-item sublabel is redundant */
 html.joget-skin #builders .builder-form ul.jskin-grouped > li.item > a .item-sublabel { display: none; }
 html.joget-skin #builders .builder-form ul.jskin-grouped > li.has-sublabel > a .item-label { max-width: none; }
+
+/* Compact rows in all builder columns (Form / List / UI / Process, and the others when shown).
+ * Joget default: li min-height 50px, link padding 5px, item-id on its own (hidden) line,
+ * 35px action buttons => ~54px rows. Here: one line, ~26px. Only the name (item-label)
+ * shows; the ID (item-id) appears on hover as small grey text on the right, absolutely
+ * positioned so the row height never changes. */
+html.joget-skin #builders .builder-type ul > li.item {
+  min-height: 0 !important;
+  align-items: center;
+}
+html.joget-skin #builders .builder-type ul > li.item + li.item { margin-top: 2px !important; }
+html.joget-skin #builders .builder-type ul > li.item > a.item-link {
+  position: relative;
+  padding: 2px 10px !important;
+  line-height: 20px;
+}
+html.joget-skin #builders .builder-type ul > li.item > a.item-link .item-label {
+  display: inline;
+  padding-right: 0;
+  font-size: 13px;
+}
+html.joget-skin #builders .builder-type ul > li.item > a.item-link .item-id {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: block;
+  max-width: 60%;
+  padding: 0 0 0 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: #fff;            /* covers a long name underneath while hovering */
+  color: #999 !important;
+  font-size: 11px !important;
+  line-height: 20px;
+  visibility: hidden;
+  pointer-events: none;
+}
+html.joget-skin #builders .builder-type ul > li.item:hover > a.item-link .item-id { visibility: visible; }
+html.joget-skin #builders .builder-type ul > li.item > .builder-actions { align-self: center; }
+html.joget-skin #builders .builder-type ul > li.item > .builder-actions .item-actions-btn {
+  padding: 2px 10px !important;
+  line-height: 20px;
+}
+html.joget-skin #builders .builder-type ul > li.item > .builder-actions a.launch,
+html.joget-skin #builders .builder-type ul > li.item > .builder-actions a.runprocess {
+  font-size: 16px !important;
+  line-height: 20px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
 
 /* Toolbar button group is only shown while the skin is on (composer.js also removes it). */
 html:not(.joget-skin) #jskin-others-group { display: none !important; }
