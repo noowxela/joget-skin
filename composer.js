@@ -10,11 +10,13 @@
  *    click / hover / actions handlers on #builder_canvas keep working.
  * 3. Group headers are clickable (chevron) to collapse/expand one group; two buttons
  *    next to Form Builder's "+" collapse / expand all groups. The collapsed tables live in
- *    an in-memory Set (the single source of truth for this tab) and are saved per app in
- *    browser.storage.local "jogetSkinComposerCollapsed:<appId>" = { tables, tab, seq }.
- *    Our own storage echoes are ignored (they could arrive late and roll the Set back);
- *    only changes written by another tab are applied. Every pass re-derives the DOM from
- *    the Set, so Joget re-renders (renderBuilders, search, publish, undo) can't reopen groups.
+ *    an in-memory Set: read from browser.storage.local "jogetSkinComposerCollapsed:<appId>"
+ *    ONCE at start, written ONLY on those user clicks, never synced live (no onChanged).
+ *    Every pass re-derives the classes from the Set and only touches a class when it differs,
+ *    so Joget re-renders can't reopen groups and the observer never feeds itself.
+ * 4. Single owner: only one copy may manage the page. If another Joget Skin copy is running
+ *    (e.g. an older version installed under another add-on id), this copy stands down and
+ *    shows a small notice instead of fighting over the classes (that fight = flapping).
  *    While Joget's search (or a tag filter / usages view) is active, nothing is collapsed,
  *    so every group with matches is visible; the saved state is left untouched.
  *
@@ -28,6 +30,10 @@
   if (!/\/web\/console\/app\/[^/]+\/[^/]+\/builders\/?$/.test(location.pathname)) {
     return;
   }
+  if (window !== window.top || window.__jskinComposerLoaded) {
+    return; // top frame, one instance per extension
+  }
+  window.__jskinComposerLoaded = true;
 
   const ROOT = document.documentElement;
   const SKIN_CLASS = "joget-skin";
@@ -45,11 +51,15 @@
   const APP_ID = (location.pathname.match(/\/console\/app\/([^/]+)\//) || [])[1] || "";
 
   const COLLAPSE_KEY = LEGACY_COLLAPSE_KEY + ":" + APP_ID;
-  const TAB_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const OWNER_ATTR = "data-jskin-composer-owner";   // on <html>: which copy manages the page
+  const TOKEN = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const COLLAPSE_CLASSES = ["jskin-collapsed", COLLAPSED_ITEM];
 
   let collapsed = new Set(); // tables collapsed in this app (source of truth)
-  let collapseTouched = false; // user changed it before the initial storage read finished
-  let writeSeq = 0;
+  let collapseTouched = false; // user clicked before the initial storage read finished
+  const mine = new WeakSet(); // nodes this copy created
+  let stoodDown = false;
+  let churn = []; // timestamps of passes that changed collapse classes (loop breaker)
 
   let showOthers = false;
   let busy = false;          // true while we mutate the DOM ourselves
@@ -75,8 +85,13 @@
   function updateButtonLabel(btn) {
     const label = showOthers ? "隐藏其他 Builder" : "显示其他 Builder";
     // aria-label, not title: Joget turns toolbar titles into cached tooltips that would go stale
-    btn.setAttribute("aria-label", label);
-    btn.setAttribute("aria-pressed", showOthers ? "true" : "false");
+    const pressed = showOthers ? "true" : "false";
+    if (btn.getAttribute("aria-label") !== label) {
+      btn.setAttribute("aria-label", label);
+    }
+    if (btn.getAttribute("aria-pressed") !== pressed) {
+      btn.setAttribute("aria-pressed", pressed);
+    }
     const icon = btn.querySelector("i");
     const span = btn.querySelector("span");
     const iconClass = showOthers ? "las la-eye-slash" : "las la-eye";
@@ -109,6 +124,7 @@
     }
     // Same markup/classes as Joget's own toolbar groups => native look.
     const group = document.createElement("div");
+    mine.add(group);
     group.id = BTN_GROUP_ID;
     group.className = "btn-group toolbar-group me-3";
     group.setAttribute("role", "group");
@@ -123,6 +139,9 @@
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (stoodDown) {
+        return;
+      }
       showOthers = !showOthers;
       browser.storage.local.set({ [SHOW_KEY]: showOthers });
       applyHideClass();
@@ -145,6 +164,7 @@
 
   function makeHeader(table, count) {
     const h = document.createElement("li");
+    mine.add(h);
     h.className = HEADER_CLASS;
     h.setAttribute("data-jskin-table", table);
     h.setAttribute("role", "button");
@@ -163,6 +183,9 @@
     const toggle = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (stoodDown) {
+        return;
+      }
       const set = collapsedSet();
       if (set.has(table)) {
         set.delete(table);
@@ -251,8 +274,8 @@
   function saveCollapsed(set) {
     collapsed = new Set(set);
     collapseTouched = true;
-    const rec = { tables: Array.from(collapsed), tab: TAB_ID, seq: ++writeSeq };
-    browser.storage.local.set({ [COLLAPSE_KEY]: rec }).catch(() => {});
+    // the only place collapse state is written; called from user clicks only
+    browser.storage.local.set({ [COLLAPSE_KEY]: { tables: Array.from(collapsed) } }).catch(() => {});
     schedule();
   }
 
@@ -304,7 +327,9 @@
     a.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      onClick();
+      if (!stoodDown) {
+        onClick();
+      }
     });
     return a;
   }
@@ -325,6 +350,7 @@
       existing.remove();
     }
     const wrap = document.createElement("span");
+    mine.add(wrap);
     wrap.className = TITLE_BTNS_CLASS;
     wrap.append(
       makeTitleBtn("jskin-collapse-all", "las la-angle-double-up", "全部收起", () => {
@@ -367,8 +393,90 @@
   }
 
   /* ---------- main pass ---------- */
+  /* ---------- single owner / stand down ---------- */
+  function otherCopyRunning() {
+    const owner = ROOT.getAttribute(OWNER_ATTR);
+    if (owner && owner !== TOKEN) {
+      return true;
+    }
+    const g = document.getElementById(BTN_GROUP_ID);
+    if (g && !mine.has(g)) {
+      return true;
+    }
+    for (const el of document.querySelectorAll("." + HEADER_CLASS + ", ." + TITLE_BTNS_CLASS)) {
+      if (!mine.has(el)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function standDown(reason) {
+    if (stoodDown) {
+      return;
+    }
+    stoodDown = true;
+    observer.disconnect();
+    rootObserver.disconnect();
+    const owner = ROOT.getAttribute(OWNER_ATTR);
+    if (owner && owner !== TOKEN) {
+      // a newer copy owns the page: touch nothing, it manages the list
+      console.warn("[Joget Skin] another copy of the extension owns App Composer; this copy stays idle:", reason);
+      showConflictNotice();
+      return;
+    }
+    // we were managing it and an older copy (no owner mark) is fighting us:
+    // hand the list back in a neutral state (nothing hidden by us)
+    document.querySelectorAll("." + COLLAPSE_CLASSES.join(", .")).forEach((el) => {
+      el.classList.remove(...COLLAPSE_CLASSES);
+    });
+    // drop our own buttons so the other copy can (re)create working ones
+    document.querySelectorAll("#" + BTN_GROUP_ID + ", ." + TITLE_BTNS_CLASS).forEach((el) => {
+      if (mine.has(el)) {
+        el.remove();
+      }
+    });
+    if (ROOT.getAttribute(OWNER_ATTR) === TOKEN) {
+      ROOT.removeAttribute(OWNER_ATTR);
+    }
+    console.warn("[Joget Skin] another copy of the extension is managing App Composer; this copy stands down:", reason);
+    showConflictNotice();
+  }
+
+  function showConflictNotice() {
+    if (!document.body || document.getElementById("jskin-conflict-notice")) {
+      return;
+    }
+    const n = document.createElement("div");
+    n.id = "jskin-conflict-notice";
+    n.setAttribute("role", "status");
+    n.textContent =
+      "Joget Skin：检测到浏览器里同时装了两个 Joget Skin（可能有旧版本），为免互相打架已停用其中一个。" +
+      "请到 about:addons 和 about:debugging 删掉旧的那个，然后刷新页面。";
+    const x = document.createElement("button");
+    x.type = "button";
+    x.textContent = "×";
+    x.setAttribute("aria-label", "关闭");
+    x.addEventListener("click", () => n.remove());
+    n.append(x);
+    n.style.cssText =
+      "position:fixed;left:12px;bottom:12px;z-index:100000;max-width:460px;padding:8px 32px 8px 12px;" +
+      "background:#fff3cd;color:#664d03;border:1px solid #ffe69c;border-radius:4px;font-size:12px;line-height:1.5;" +
+      "box-shadow:0 2px 8px rgba(0,0,0,.15)";
+    x.style.cssText =
+      "position:absolute;right:6px;top:4px;border:0;background:none;color:inherit;font-size:16px;cursor:pointer";
+    document.body.append(n);
+  }
+
   function run() {
     scheduled = false;
+    if (stoodDown) {
+      return;
+    }
+    if (otherCopyRunning()) {
+      standDown("found nodes or owner mark from another copy");
+      return;
+    }
     busy = true;
     try {
       applyHideClass();
@@ -388,6 +496,16 @@
         if (changed || before !== ul.getAttribute("data-jskin-grouped")) {
           relayout();
         }
+        if (changed) {
+          // loop breaker: collapse classes should change only after a click or a Joget re-render,
+          // never continuously; if they keep changing, something else is fighting us
+          const now = Date.now();
+          churn = churn.filter((t) => now - t < 3000);
+          churn.push(now);
+          if (churn.length > 30) {
+            standDown("collapse classes keep changing (loop)");
+          }
+        }
       }
     } finally {
       // Drop the records of our own mutations synchronously. (The old setTimeout(0)
@@ -406,42 +524,53 @@
 
   /* ---------- observers ---------- */
   // Joget re-renders #builders (switching views, search, add/delete items).
-  const observer = new MutationObserver(() => {
-    if (!busy) {
-      schedule();
+  // Our own mutations are dropped via takeRecords() at the end of run(), so any change to
+  // one of our "jskin-*" classes (collapsed, collapsed-item, group-empty, ...) seen here was
+  // made by someone else = another copy of this extension (any version). Joget's own classes
+  // (search_hide, usage_hide, delete-highlight, ...) are not "jskin-*" and are ignored.
+  function jskinTokens(str) {
+    return (str || "")
+      .split(/\s+/)
+      .filter((c) => c.startsWith("jskin-"))
+      .sort()
+      .join(" ");
+  }
+  function foreignJskinChange(r) {
+    if (r.type !== "attributes" || r.attributeName !== "class" || !r.target.classList) {
+      return false;
     }
+    if (r.target === ROOT) {
+      return false; // <html> classes belong to content.js / the show-others button
+    }
+    return jskinTokens(r.oldValue) !== jskinTokens(r.target.getAttribute("class"));
+  }
+
+  const observer = new MutationObserver((records) => {
+    if (busy || stoodDown) {
+      return;
+    }
+    if (records.some(foreignJskinChange)) {
+      standDown("another script toggled the collapse classes");
+      return;
+    }
+    schedule();
   });
   observer.observe(document.body || ROOT, {
     childList: true,
     subtree: true,
     attributes: true,
+    attributeOldValue: true,
     attributeFilter: ["style", "class"],
   });
 
   // Skin on/off switch (content.js toggles the class on <html>).
-  new MutationObserver(schedule).observe(ROOT, { attributes: true, attributeFilter: ["class"] });
+  const rootObserver = new MutationObserver(schedule);
+  rootObserver.observe(ROOT, { attributes: true, attributeFilter: ["class"] });
 
-  browser.storage.onChanged.addListener((changes, area) => {
-    if (area !== "local") {
-      return;
-    }
-    if (changes[SHOW_KEY]) {
-      showOthers = changes[SHOW_KEY].newValue === true;
-    }
-    let collapseChanged = false;
-    if (changes[COLLAPSE_KEY]) {
-      const rec = changes[COLLAPSE_KEY].newValue;
-      // Ignore echoes of our own writes: they can arrive after a newer local change
-      // and would roll the Set back (= groups "re-open by themselves").
-      if (!rec || rec.tab !== TAB_ID) {
-        collapsed = new Set((rec && rec.tables) || []);
-        collapseChanged = true;
-      }
-    }
-    if (changes[SHOW_KEY] || collapseChanged) {
-      schedule();
-    }
-  });
+  // claim the page (another copy that got here first => we stand down on the first pass)
+  if (!ROOT.hasAttribute(OWNER_ATTR)) {
+    ROOT.setAttribute(OWNER_ATTR, TOKEN);
+  }
 
   // search box typing (Joget filters on keyup); re-evaluate collapse
   document.addEventListener("input", (e) => {
@@ -459,8 +588,7 @@
       if (rec && Array.isArray(rec.tables)) {
         collapsed = new Set(rec.tables);
       } else if (Array.isArray(legacy)) {
-        collapsed = new Set(legacy); // migrate v1.3.3 shared map
-        saveCollapsed(collapsed);
+        collapsed = new Set(legacy); // v1.3.3 shared map; saved under the new key on next click
       }
     }
     schedule();

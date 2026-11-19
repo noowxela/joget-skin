@@ -18,7 +18,19 @@
         gap: 8px;
         cursor: pointer;
       }
-      .theme-row {
+      .top-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .version {
+        color: #888;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .row {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -26,11 +38,15 @@
         margin-top: 10px;
         cursor: default;
       }
+      .check-row {
+        margin-top: 10px;
+      }
       select {
         font: inherit;
         padding: 2px 4px;
       }
-      select:disabled {
+      select:disabled,
+      .check-row.disabled {
         opacity: 0.5;
       }
       .hint {
@@ -39,40 +55,33 @@
         font-size: 12px;
       }
       @media (prefers-color-scheme: dark) {
-        .theme-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-top: 10px;
-        cursor: default;
-      }
-      select {
-        font: inherit;
-        padding: 2px 4px;
-      }
-      select:disabled {
-        opacity: 0.5;
-      }
-      .hint {
+        .hint,
+        .version {
           color: #aaa;
         }
       }
     </style>
   </head>
   <body>
-    <label>
-      <input type="checkbox" id="toggle" />
-      <span>启用 Joget Skin</span>
-    </label>
-    <label class="theme-row" for="theme">
+    <div class="top-row">
+      <label>
+        <input type="checkbox" id="toggle" />
+        <span>启用 Joget Skin</span>
+      </label>
+      <span class="version" id="version"></span>
+    </div>
+    <label class="row" for="theme">
       <span>主题</span>
       <select id="theme">
         <option value="default">原本 (Joget 默认)</option>
         <option value="indigo">Indigo</option>
       </select>
     </label>
-    <p class="hint">关闭后隐藏项、App Composer 布局和主题全部还原成 Joget 原样，不用刷新页面。</p>
+    <label class="check-row" id="chime-row">
+      <input type="checkbox" id="chime" />
+      <span>保存成功提示音</span>
+    </label>
+    <p class="hint">关闭后隐藏项、App Composer 布局、主题和提示音全部还原成 Joget 原样，不用刷新页面。</p>
     <script src="popup.js"></script>
   </body>
 </html>
