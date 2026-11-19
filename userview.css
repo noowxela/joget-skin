@@ -1,0 +1,63 @@
+/*
+ * End-user userview pages (/jw/web/userview/... and embed).
+ * Scoped under html.joget-skin. Theme class names vary (Universal / Progressive / custom).
+ * Inspect body classList and CSS variables on your deployment before hard-coding.
+ */
+
+html.joget-skin {
+  --joget-uv-bg: #f8fafc;
+  --joget-uv-surface: #ffffff;
+  --joget-uv-text: #0f172a;
+  --joget-uv-muted: #64748b;
+  --joget-uv-border: #e2e8f0;
+  --joget-uv-accent: #0ea5e9;
+  --joget-uv-radius: 10px;
+  --joget-uv-font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+html.joget-skin body {
+  font-family: var(--joget-uv-font) !important;
+  color: var(--joget-uv-text);
+  background-color: var(--joget-uv-bg);
+}
+
+html.joget-skin #page,
+html.joget-skin #content,
+html.joget-skin .page_content,
+html.joget-skin .main-body-content {
+  background-color: var(--joget-uv-bg) !important;
+}
+
+html.joget-skin a {
+  color: var(--joget-uv-accent);
+}
+
+html.joget-skin .card,
+html.joget-skin .panel,
+html.joget-skin .form-section,
+html.joget-skin .dataList {
+  background-color: var(--joget-uv-surface) !important;
+  border-color: var(--joget-uv-border) !important;
+  border-radius: var(--joget-uv-radius);
+}
+
+html.joget-skin .btn,
+html.joget-skin button,
+html.joget-skin input[type="button"],
+html.joget-skin input[type="submit"] {
+  border-radius: 8px !important;
+}
+
+html.joget-skin input[type="text"],
+html.joget-skin input[type="password"],
+html.joget-skin select,
+html.joget-skin textarea {
+  border-radius: 8px !important;
+  border-color: var(--joget-uv-border) !important;
+}
+
+/* Prefer overriding theme CSS variables when the theme defines them, e.g.:
+html.joget-skin {
+  --theme-primary-color: #0ea5e9;
+}
+*/

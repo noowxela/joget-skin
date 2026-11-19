@@ -1,0 +1,93 @@
+/*
+ * Conservative restyle for Joget DX console / visual builders
+ * (Form / List / UI / Process / Theme Builder, App Composer).
+ * Scoped under html.joget-skin so the toolbar toggle can disable instantly.
+ *
+ * Safety rules for builders:
+ * - Prefer color / spacing / typography; avoid changing position/display/overflow
+ *   on drag sources, drop targets, canvases, or floating property panels.
+ * - Do not set pointer-events: none on interactive chrome.
+ * - Inspect real class names with DevTools on your Joget version before tightening selectors.
+ */
+
+html.joget-skin {
+  --joget-skin-bg: #f4f6f8;
+  --joget-skin-surface: #ffffff;
+  --joget-skin-text: #1f2937;
+  --joget-skin-muted: #6b7280;
+  --joget-skin-border: #e5e7eb;
+  --joget-skin-accent: #2563eb;
+  --joget-skin-radius: 8px;
+  --joget-skin-font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  html.joget-skin.joget-skin--follow-system {
+    --joget-skin-bg: #0f172a;
+    --joget-skin-surface: #1e293b;
+    --joget-skin-text: #e2e8f0;
+    --joget-skin-muted: #94a3b8;
+    --joget-skin-border: #334155;
+    --joget-skin-accent: #60a5fa;
+  }
+}
+
+/* Opt-in dark follow: content.js can add joget-skin--follow-system later if desired.
+   For now dark tokens apply only when that class is present. */
+
+html.joget-skin body {
+  font-family: var(--joget-skin-font) !important;
+  color: var(--joget-skin-text);
+  background-color: var(--joget-skin-bg);
+}
+
+/* Soften common page chrome without touching absolute/fixed builder overlays. */
+html.joget-skin #main,
+html.joget-skin #content,
+html.joget-skin .main-body,
+html.joget-skin .page-content {
+  background-color: var(--joget-skin-bg) !important;
+}
+
+html.joget-skin a {
+  color: var(--joget-skin-accent);
+}
+
+/* Cards / panels — visual only */
+html.joget-skin .card,
+html.joget-skin .panel,
+html.joget-skin .box,
+html.joget-skin .ui-widget-content {
+  background-color: var(--joget-skin-surface) !important;
+  border-color: var(--joget-skin-border) !important;
+  border-radius: var(--joget-skin-radius);
+}
+
+/* Buttons — color + radius only */
+html.joget-skin button,
+html.joget-skin .btn,
+html.joget-skin input[type="button"],
+html.joget-skin input[type="submit"] {
+  border-radius: 6px !important;
+}
+
+/* Forms — readable spacing */
+html.joget-skin input[type="text"],
+html.joget-skin input[type="password"],
+html.joget-skin input[type="search"],
+html.joget-skin select,
+html.joget-skin textarea {
+  border-color: var(--joget-skin-border) !important;
+  border-radius: 6px !important;
+}
+
+html.joget-skin ::placeholder {
+  color: var(--joget-skin-muted);
+}
+
+/*
+ * Builder canvas / palette: do NOT rewrite layout/position here.
+ * Add version-specific selectors after inspecting your Joget DX build, e.g.:
+ *   html.joget-skin .builder_palette { background: ... }
+ * Avoid overflow:hidden and transform on .ui-draggable / droppable parents.
+ */

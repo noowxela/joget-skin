@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <title>Joget Skin</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font: 14px/1.4 system-ui, sans-serif;
+      }
+      body {
+        margin: 12px 14px;
+        min-width: 220px;
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+      }
+      .hint {
+        margin: 10px 0 0;
+        color: #666;
+        font-size: 12px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .hint {
+          color: #aaa;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <label>
+      <input type="checkbox" id="toggle" />
+      <span>启用 Joget Skin</span>
+    </label>
+    <p class="hint">关闭后立即去掉 <code>html.joget-skin</code>，方便排查拖拽/布局问题。</p>
+    <script src="popup.js"></script>
+  </body>
+</html>
