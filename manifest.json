@@ -1,18 +1,22 @@
 {
   "manifest_version": 3,
   "name": "Joget Skin (builder + userview)",
-  "version": "1.0.0",
-  "description": "Restyle Joget DX console/builders and userview pages with a toggleable CSS skin.",
+  "version": "1.1.0",
+  "description": "Modern clean skin for Joget DX 9 builders, App Composer, web console and userview pages (toggleable).",
   "browser_specific_settings": {
     "gecko": {
       "id": "joget-skin@local.dev",
-      "strict_min_version": "109.0",
+      "strict_min_version": "142.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
   },
-  "permissions": ["storage"],
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "*://*/jw/web/console/*",
     "*://*/jw/web/userview/*",
@@ -29,13 +33,19 @@
         "*://*/jw/web/userview/*",
         "*://*/jw/web/embed/userview/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": true
     },
     {
-      "matches": ["*://*/jw/web/console/*"],
-      "css": ["builder.css"],
+      "matches": [
+        "*://*/jw/web/console/*"
+      ],
+      "css": [
+        "builder.css"
+      ],
       "run_at": "document_start",
       "all_frames": true,
       "css_origin": "author"
@@ -45,7 +55,9 @@
         "*://*/jw/web/userview/*",
         "*://*/jw/web/embed/userview/*"
       ],
-      "css": ["userview.css"],
+      "css": [
+        "userview.css"
+      ],
       "run_at": "document_start",
       "all_frames": true,
       "css_origin": "author"

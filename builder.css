@@ -1,93 +1,450 @@
 /*
- * Conservative restyle for Joget DX console / visual builders
- * (Form / List / UI / Process / Theme Builder, App Composer).
- * Scoped under html.joget-skin so the toolbar toggle can disable instantly.
+ * Joget Skin — builder.css
+ * Verified against Joget DX Enterprise 9.1.2.2 (build ee559cd), local Docker, 2026-11-19.
  *
- * Safety rules for builders:
- * - Prefer color / spacing / typography; avoid changing position/display/overflow
- *   on drag sources, drop targets, canvases, or floating property panels.
- * - Do not set pointer-events: none on interactive chrome.
- * - Inspect real class names with DevTools on your Joget version before tightening selectors.
+ * Applies to /jw/web/console/* :
+ *   - App Composer        /jw/web/console/app/{appId}/{ver}/builders        body.property-editor-migrated (no .default-builder)
+ *   - Form Builder        /jw/web/console/app/{appId}/{ver}/form/builder/{formId}      body.default-builder.form
+ *   - List Builder        /jw/web/console/app/{appId}/{ver}/datalist/builder/{listId}  body.default-builder.datalist
+ *   - UI (Userview) Bldr  /jw/web/console/app/{appId}/{ver}/userview/builder/{uvId}    body.default-builder.userview
+ *   - Process Builder     /jw/web/console/app/{appId}/{ver}/process/builder#{procId}   body.default-builder.process
+ *   - Old web console     /jw/web/console/setting/*, /directory/*, /monitor/*         body.webconsole
+ *
+ * The builder CANVAS content lives in an iframe at /jw/builder/blank.jsp, which this
+ * extension intentionally does NOT match, so form/list/UI previews keep their real look.
+ *
+ * Safety rules (drag & drop):
+ *   - Only colour / border-colour / radius / shadow / font changes on palette items,
+ *     #builder_canvas, #element-select-box, #lf-container (process canvas) and jsPlumb nodes.
+ *   - No position / display / width / height / overflow / transform changes on those.
+ *   - Anything that changes size or visibility is in the "OPT-IN" block at the bottom (commented out).
+ *
+ * Everything is scoped under html.joget-skin (toolbar toggle removes that class).
+ * Light skin only: if you switch Joget's builder to its dark theme (body[builder-theme="dark"]),
+ * turn the skin off or adjust the tokens.
  */
 
+/* ============================================================
+ * 1. THEME TOKENS — change these to retheme
+ * ============================================================ */
 html.joget-skin {
-  --joget-skin-bg: #f4f6f8;
-  --joget-skin-surface: #ffffff;
-  --joget-skin-text: #1f2937;
-  --joget-skin-muted: #6b7280;
-  --joget-skin-border: #e5e7eb;
-  --joget-skin-accent: #2563eb;
-  --joget-skin-radius: 8px;
-  --joget-skin-font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --js-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+
+  --js-bg: #f6f7f9;          /* page background behind panels */
+  --js-surface: #ffffff;     /* panels, top bar */
+  --js-surface-2: #f9fafb;   /* subtle fills: headers, hover */
+  --js-surface-3: #f1f3f5;   /* pressed / active fills */
+  --js-border: #e6e8eb;
+  --js-border-strong: #d4d8dd;
+
+  --js-text: #111827;
+  --js-text-2: #374151;
+  --js-muted: #6b7280;
+
+  --js-accent: #4f46e5;                  /* the one accent colour */
+  --js-accent-hover: #4338ca;
+  --js-accent-soft: rgba(79, 70, 229, 0.08);
+  --js-accent-ring: rgba(79, 70, 229, 0.25);
+  --js-on-accent: #ffffff;
+
+  --js-danger: #dc2626;
+
+  --js-radius: 8px;
+  --js-radius-sm: 6px;
+  --js-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --js-shadow-lg: 0 8px 24px rgba(16, 24, 40, 0.10);
+  --js-transition: 120ms ease;
+
+  /* Joget's own console variables (defined on :root in v7.css) — mapped to the tokens above */
+  --console-button-primary-bg: var(--js-accent);
+  --console-button-primary-bg-hover: var(--js-accent-hover);
+  --console-button-secondary-bg: #4b5563;
+  --console-button-secondary-bg-hover: #374151;
+  --console-button-tertiary-bg-hover: var(--js-accent-soft);
 }
 
-@media (prefers-color-scheme: dark) {
-  html.joget-skin.joget-skin--follow-system {
-    --joget-skin-bg: #0f172a;
-    --joget-skin-surface: #1e293b;
-    --joget-skin-text: #e2e8f0;
-    --joget-skin-muted: #94a3b8;
-    --joget-skin-border: #334155;
-    --joget-skin-accent: #60a5fa;
-  }
-}
-
-/* Opt-in dark follow: content.js can add joget-skin--follow-system later if desired.
-   For now dark tokens apply only when that class is present. */
-
+/* ============================================================
+ * 2. BASE
+ * ============================================================ */
 html.joget-skin body {
-  font-family: var(--joget-skin-font) !important;
-  color: var(--joget-skin-text);
-  background-color: var(--joget-skin-bg);
+  font-family: var(--js-font) !important;
+  color: var(--js-text);
+  background-color: var(--js-bg) !important;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Soften common page chrome without touching absolute/fixed builder overlays. */
-html.joget-skin #main,
-html.joget-skin #content,
-html.joget-skin .main-body,
-html.joget-skin .page-content {
-  background-color: var(--joget-skin-bg) !important;
-}
+html.joget-skin ::placeholder { color: var(--js-muted) !important; opacity: 1; }
+html.joget-skin ::selection { background: var(--js-accent-ring); }
 
-html.joget-skin a {
-  color: var(--joget-skin-accent);
+/* ============================================================
+ * 3. BUTTONS (Bootstrap 5 classes used across all builders)
+ * ============================================================ */
+html.joget-skin .btn {
+  border-radius: var(--js-radius-sm) !important;
+  transition: background-color var(--js-transition), border-color var(--js-transition), color var(--js-transition);
 }
-
-/* Cards / panels — visual only */
-html.joget-skin .card,
-html.joget-skin .panel,
-html.joget-skin .box,
-html.joget-skin .ui-widget-content {
-  background-color: var(--joget-skin-surface) !important;
-  border-color: var(--joget-skin-border) !important;
-  border-radius: var(--joget-skin-radius);
+html.joget-skin .btn-primary {
+  background-color: var(--js-accent) !important;
+  border-color: var(--js-accent) !important;
+  color: var(--js-on-accent) !important;
+  box-shadow: var(--js-shadow);
 }
-
-/* Buttons — color + radius only */
-html.joget-skin button,
-html.joget-skin .btn,
-html.joget-skin input[type="button"],
-html.joget-skin input[type="submit"] {
-  border-radius: 6px !important;
+html.joget-skin .btn-primary:hover,
+html.joget-skin .btn-primary:focus {
+  background-color: var(--js-accent-hover) !important;
+  border-color: var(--js-accent-hover) !important;
 }
+html.joget-skin .btn-secondary {
+  background-color: var(--js-surface) !important;
+  border-color: var(--js-border-strong) !important;
+  color: var(--js-text-2) !important;
+}
+html.joget-skin .btn-secondary:hover { background-color: var(--js-surface-2) !important; }
+html.joget-skin .btn-light {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  color: var(--js-text-2) !important;
+}
+html.joget-skin .btn-light:hover { background-color: var(--js-surface-3) !important; }
+html.joget-skin .btn-light.active,
+html.joget-skin .btn-light.active-view {
+  background-color: var(--js-surface) !important;
+  color: var(--js-accent) !important;
+  box-shadow: 0 0 0 1px var(--js-border), var(--js-shadow) !important;
+}
+html.joget-skin .btn:focus-visible { box-shadow: 0 0 0 3px var(--js-accent-ring) !important; }
 
-/* Forms — readable spacing */
+/* ============================================================
+ * 4. INPUTS (property editor, palette search, console forms)
+ * ============================================================ */
 html.joget-skin input[type="text"],
 html.joget-skin input[type="password"],
 html.joget-skin input[type="search"],
+html.joget-skin input[type="number"],
+html.joget-skin input[type="email"],
 html.joget-skin select,
-html.joget-skin textarea {
-  border-color: var(--joget-skin-border) !important;
-  border-radius: 6px !important;
+html.joget-skin textarea,
+html.joget-skin .form-control,
+html.joget-skin .chosen-container .chosen-single {
+  border: 1px solid var(--js-border-strong) !important;
+  border-radius: var(--js-radius-sm) !important;
+  background-color: var(--js-surface) !important;
+  color: var(--js-text) !important;
+  box-shadow: none !important;
+  transition: border-color var(--js-transition), box-shadow var(--js-transition);
+}
+html.joget-skin input:focus,
+html.joget-skin select:focus,
+html.joget-skin textarea:focus,
+html.joget-skin .form-control:focus {
+  border-color: var(--js-accent) !important;
+  box-shadow: 0 0 0 3px var(--js-accent-ring) !important;
+  outline: none !important;
+}
+html.joget-skin input[type="checkbox"],
+html.joget-skin input[type="radio"] { accent-color: var(--js-accent); }
+
+/* ============================================================
+ * 5. TOP BAR  (#top-panel > #builderIcon + #top-panel-main)
+ * ============================================================ */
+html.joget-skin #top-panel {
+  background-color: var(--js-surface) !important;
+  border-bottom: 1px solid var(--js-border) !important;
+  box-shadow: none !important;
+}
+/* Builder tile (top-left). Default Joget paints it blue/green/purple/red per builder.
+ * Here it becomes a calm surface with an accent icon. To restore Joget's colours,
+ * delete this block. */
+html.joget-skin #builderIcon {
+  background: var(--js-surface) !important;
+  color: var(--js-text) !important;
+  border-right: 1px solid var(--js-border);
+}
+html.joget-skin #builderTitle { color: var(--js-text) !important; font-weight: 600; letter-spacing: -0.01em; }
+html.joget-skin #builderTitle i { color: var(--js-accent) !important; }
+
+html.joget-skin #builderElementName .title { color: var(--js-text) !important; font-weight: 600; }
+html.joget-skin #builderElementName .title .item_name { color: var(--js-text) !important; }
+html.joget-skin #builderElementName small.published {
+  color: #047857 !important;
+  background: #ecfdf5;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-weight: 500;
+}
+html.joget-skin #main-action-help { color: var(--js-muted) !important; }
+
+/* Toolbar groups: Design / Settings / Preview, Advanced Tools, undo/redo, viewport */
+html.joget-skin #builderToolbar .toolbar-group {
+  background-color: var(--js-surface-3) !important;
+  border-radius: var(--js-radius) !important;
+}
+html.joget-skin #builderToolbar .btn.disabled { opacity: 0.35; }
+
+/* ============================================================
+ * 6. LEFT PALETTE  (#left-panel .drag-elements)
+ * ============================================================ */
+html.joget-skin #left-panel,
+html.joget-skin #left-panel .drag-elements {
+  background-color: var(--js-surface) !important;
+  border-color: var(--js-border) !important;
+}
+html.joget-skin #left-panel { border-right: 1px solid var(--js-border) !important; }
+html.joget-skin #left-panel .component-search {
+  border: 0 !important;
+  border-bottom: 1px solid var(--js-border) !important;
+  border-radius: 0 !important;
+  background-color: var(--js-surface-2) !important;
+}
+html.joget-skin #left-panel .component-search:focus { box-shadow: inset 0 -2px 0 var(--js-accent) !important; }
+/* Category headers ("Basic", "Custom", "Process Elements", "Tools") */
+html.joget-skin #left-panel .components-list li.header > label.header {
+  color: var(--js-muted) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+/* Palette items = DRAG SOURCES: colour/border/radius/shadow only (no size changes) */
+html.joget-skin #left-panel .components-list ol > li {
+  background-color: var(--js-surface) !important;
+  border-color: var(--js-border) !important;
+  border-radius: var(--js-radius-sm) !important;
+  color: var(--js-text-2) !important;
+  transition: border-color var(--js-transition), box-shadow var(--js-transition), color var(--js-transition);
+}
+html.joget-skin #left-panel .components-list ol > li:hover {
+  border-color: var(--js-accent) !important;
+  color: var(--js-accent) !important;
+  box-shadow: var(--js-shadow);
+}
+html.joget-skin #left-panel .components-list ol > li i { color: var(--js-muted); }
+html.joget-skin #left-panel .components-list ol > li:hover i { color: var(--js-accent); }
+html.joget-skin #left-panel .marketplace-link { color: var(--js-muted) !important; font-size: 12px; }
+html.joget-skin #left-panel-toogle,
+html.joget-skin #right-panel-resize {
+  background-color: var(--js-surface) !important;
+  border-color: var(--js-border) !important;
+  color: var(--js-muted) !important;
 }
 
-html.joget-skin ::placeholder {
-  color: var(--joget-skin-muted);
+/* ============================================================
+ * 7. CANVAS FRAME  (#builder_canvas wraps iframe#iframe1)
+ *    Colours only. The element selection box is recoloured, not resized.
+ * ============================================================ */
+html.joget-skin #builder_canvas { border-color: var(--js-border) !important; }
+html.joget-skin #element-select-box { border-color: var(--js-accent) !important; }
+html.joget-skin #element-select-name .element-name,
+html.joget-skin #element-select-name .element-actions {
+  background-color: var(--js-accent) !important;
+  color: var(--js-on-accent) !important;
+}
+html.joget-skin #element-select-name .element-actions a { color: var(--js-on-accent) !important; }
+html.joget-skin .element-bottom-actions a { color: var(--js-accent) !important; }
+
+/* ============================================================
+ * 8. RIGHT PROPERTY PANEL  (#right-panel .element-properties)
+ * ============================================================ */
+html.joget-skin #right-panel,
+html.joget-skin #right-panel-content {
+  background-color: var(--js-surface) !important;
+  border-color: var(--js-border) !important;
+}
+html.joget-skin #right-panel { border-left: 1px solid var(--js-border) !important; }
+html.joget-skin .element-properties-header-actions .btn { color: var(--js-muted) !important; }
+html.joget-skin .element-properties-header .component-search {
+  border: 0 !important;
+  border-bottom: 1px solid var(--js-border) !important;
+  border-radius: 0 !important;
+  background-color: var(--js-surface-2) !important;
+}
+/* Properties / Styles / Mapping tabs */
+html.joget-skin #properties-tabs { border-bottom: 1px solid var(--js-border) !important; }
+html.joget-skin #properties-tabs .nav-link {
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--js-muted) !important;
+  font-weight: 500;
+}
+html.joget-skin #properties-tabs .nav-link.active {
+  color: var(--js-accent) !important;
+  border-bottom-color: var(--js-accent) !important;
+}
+/* Collapsible property pages ("Configure Section", "Data", "Advanced Options") */
+html.joget-skin .property-editor-page-title {
+  background-color: var(--js-surface) !important;
+  border-color: var(--js-border) !important;
+  color: var(--js-text) !important;
+  font-weight: 600;
+}
+html.joget-skin .property-editor-page.current > .property-editor-page-title,
+html.joget-skin .property-editor-page:not(.collapsed) > .property-editor-page-title { color: var(--js-accent) !important; }
+html.joget-skin .property-editor-page-title:hover { background-color: var(--js-surface-2) !important; }
+html.joget-skin .property-label-container,
+html.joget-skin .property-label-container label { color: var(--js-text-2) !important; font-weight: 500; }
+html.joget-skin .property-editor-property .property-description { color: var(--js-muted) !important; }
+/* Apply Change (full-width footer button) */
+html.joget-skin #apply-btn {
+  border-radius: 0 !important;
+  font-weight: 600;
+  box-shadow: none !important;
 }
 
-/*
- * Builder canvas / palette: do NOT rewrite layout/position here.
- * Add version-specific selectors after inspecting your Joget DX build, e.g.:
- *   html.joget-skin .builder_palette { background: ... }
- * Avoid overflow:hidden and transform on .ui-draggable / droppable parents.
- */
+/* ============================================================
+ * 9. QUICK NAV (right icon rail) + bottom bar
+ * ============================================================ */
+html.joget-skin #quick-nav-bar {
+  background-color: var(--js-surface) !important;
+  border-left: 1px solid var(--js-border) !important;
+}
+html.joget-skin #builder-menu li.builder-icon > span { border-radius: var(--js-radius-sm); }
+html.joget-skin #builder-menu li.builder-icon:hover > span { background-color: var(--js-surface-3); }
+html.joget-skin #builder-menu li.builder-icon.active > span { background-color: var(--js-accent-soft); }
+/* flyout list of forms/lists/... */
+html.joget-skin #builder-menu li.builder-icon > ul {
+  background-color: var(--js-surface) !important;
+  border-color: var(--js-border) !important;
+  box-shadow: var(--js-shadow-lg) !important;
+}
+html.joget-skin #builder-menu li.header .header-label { color: var(--js-text) !important; font-weight: 600; }
+html.joget-skin #builder-menu li.item a.builder-link { color: var(--js-text-2) !important; }
+html.joget-skin #builder-menu li.item a.builder-link:hover { color: var(--js-accent) !important; }
+html.joget-skin #bottom-panel {
+  background-color: var(--js-surface) !important;
+  border-color: var(--js-border) !important;
+  color: var(--js-muted) !important;
+}
+
+/* ============================================================
+ * 10. APP COMPOSER  (/console/app/{id}/{ver}/builders)
+ * ============================================================ */
+html.joget-skin #builders .builder-type { background-color: transparent !important; }
+html.joget-skin #builders .builder-title {
+  color: var(--js-text) !important;
+  font-weight: 600;
+  border-color: var(--js-border) !important;
+}
+html.joget-skin #builders .item-link {
+  border-radius: var(--js-radius-sm);
+  transition: background-color var(--js-transition);
+}
+html.joget-skin #builders li.item:hover .item-link,
+html.joget-skin #builders .item-link:hover { background-color: var(--js-surface-3) !important; }
+html.joget-skin #builders .item-label { color: var(--js-text) !important; font-weight: 500; }
+html.joget-skin #builders .item-id { color: var(--js-muted) !important; font-style: normal !important; font-size: 11px; }
+html.joget-skin #builders .addnew {
+  background-color: var(--js-surface) !important;
+  border: 1px solid var(--js-border) !important;
+  border-radius: var(--js-radius-sm) !important;
+  color: var(--js-text-2) !important;
+}
+html.joget-skin #builders .addnew:hover { border-color: var(--js-accent) !important; color: var(--js-accent) !important; }
+html.joget-skin #builders-seperator span { background-color: var(--js-border) !important; }
+html.joget-skin .canvas-header .component-search { background-color: var(--js-surface) !important; }
+html.joget-skin #showTags { color: var(--js-muted) !important; }
+
+/* ============================================================
+ * 11. PROCESS BUILDER chrome  (canvas #lf-container is NOT touched)
+ * ============================================================ */
+html.joget-skin #process-selector { background-color: transparent !important; }
+html.joget-skin #process-selector .process_action a { color: var(--js-muted) !important; }
+html.joget-skin #process-selector .process_action a:hover { color: var(--js-accent) !important; }
+html.joget-skin #pbuilder-controls-indicator {
+  background-color: var(--js-surface) !important;
+  border: 1px solid var(--js-border) !important;
+  border-radius: var(--js-radius) !important;
+  box-shadow: var(--js-shadow-lg) !important;
+}
+
+/* ============================================================
+ * 12. ADMIN BAR + first-run hint bubbles (.guider)
+ * ============================================================ */
+html.joget-skin #adminBar {
+  background-color: var(--js-surface) !important;
+  border-top: 1px solid var(--js-border);
+}
+html.joget-skin #adminBar .adminBarButton { color: var(--js-text-2) !important; }
+html.joget-skin .guider {
+  border: 1px solid var(--js-border) !important;
+  border-radius: var(--js-radius) !important;
+  box-shadow: var(--js-shadow-lg) !important;
+}
+html.joget-skin .guider .guider_title { color: var(--js-text) !important; }
+html.joget-skin .guider .guider_button {
+  border-radius: var(--js-radius-sm) !important;
+  background: var(--js-surface) !important;
+  border: 1px solid var(--js-border-strong) !important;
+  color: var(--js-text-2) !important;
+}
+html.joget-skin .guider .guider_button:last-child {
+  background: var(--js-accent) !important;
+  border-color: var(--js-accent) !important;
+  color: var(--js-on-accent) !important;
+}
+
+/* ============================================================
+ * 13. OLD WEB CONSOLE  (body.webconsole: settings, users, monitor)
+ * ============================================================ */
+html.joget-skin body.webconsole #main-header {
+  background-color: var(--js-surface) !important;
+  border-bottom: 1px solid var(--js-border);
+}
+html.joget-skin body.webconsole #logo-title { color: var(--js-text) !important; letter-spacing: 0; }
+html.joget-skin body.webconsole #header-links a { color: var(--js-text-2) !important; border-radius: var(--js-radius-sm); }
+html.joget-skin body.webconsole #header-links a:hover { background-color: var(--js-surface-3); }
+html.joget-skin body.webconsole #nav-list li > a.nav-link {
+  color: var(--js-text-2) !important;
+  border-radius: var(--js-radius-sm) !important;
+}
+html.joget-skin body.webconsole #nav-list li > a.nav-link:hover { background-color: var(--js-surface-3) !important; }
+html.joget-skin body.webconsole #nav-list li.nav-selected > a.nav-link {
+  background-color: var(--js-accent-soft) !important;
+  color: var(--js-accent) !important;
+  font-weight: 600;
+}
+html.joget-skin body.webconsole #nav-list li.nav-selected i { color: var(--js-accent) !important; }
+html.joget-skin body.webconsole #main {
+  background-color: var(--js-surface) !important;
+  border: 1px solid var(--js-border);
+  border-radius: var(--js-radius) !important;
+}
+html.joget-skin body.webconsole .main-body-content-subheader { color: var(--js-muted) !important; }
+html.joget-skin body.webconsole .main-body-content-subheader.selected,
+html.joget-skin body.webconsole .main-body-content-subheader.selected span {
+  color: var(--js-accent) !important;
+  border-bottom-color: var(--js-accent) !important;
+}
+html.joget-skin body.webconsole .smallbutton { border-radius: 999px !important; }
+html.joget-skin body.webconsole .main-body-row { border-color: var(--js-border) !important; }
+/* console tables (users, apps, monitor) */
+html.joget-skin body.webconsole table { border-color: var(--js-border) !important; }
+html.joget-skin body.webconsole table thead th {
+  background-color: var(--js-surface-2) !important;
+  color: var(--js-muted) !important;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-color: var(--js-border) !important;
+}
+html.joget-skin body.webconsole table tbody td { border-color: var(--js-border) !important; }
+html.joget-skin body.webconsole table tbody tr:hover td { background-color: var(--js-surface-2) !important; }
+html.joget-skin body.webconsole #main-body .row-content a:not(.smallbutton):not(.btn) { color: var(--js-accent); }
+
+/* ============================================================
+ * 14. OPT-IN / RISKIER TWEAKS — uncomment to try, toggle the skin off if anything breaks
+ * ============================================================ */
+/* Hide first-run hint bubbles entirely (changes visibility, harmless to drag/drop):
+html.joget-skin .guider, html.joget-skin #guider_overlay { display: none !important; }
+*/
+/* Hide the AI "composer" pill and chat dock (bottom-right):
+html.joget-skin #composerIcon, html.joget-skin #cc-dock-preview { display: none !important; }
+*/
+/* Hide memory/analyzer text in the admin bar:
+html.joget-skin #adminBar .analyzer-page { display: none !important; }
+*/
+/* Compact palette items (CHANGES SIZE of drag sources — test drag/drop after enabling):
+html.joget-skin #left-panel .components-list ol > li { padding-top: 6px !important; padding-bottom: 6px !important; }
+*/
