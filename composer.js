@@ -9,8 +9,12 @@
  *    headers. Existing <li> nodes are MOVED (never cloned), so Joget's delegated
  *    click / hover / actions handlers on #builder_canvas keep working.
  * 3. Group headers are clickable (chevron) to collapse/expand one group; two buttons
- *    next to Form Builder's "+" collapse / expand all groups. Collapsed tables are saved
- *    per app in browser.storage.local "jogetSkinComposerCollapsed" = { appId: [table, ...] }.
+ *    next to Form Builder's "+" collapse / expand all groups. The collapsed tables live in
+ *    an in-memory Set (the single source of truth for this tab) and are saved per app in
+ *    browser.storage.local "jogetSkinComposerCollapsed:<appId>" = { tables, tab, seq }.
+ *    Our own storage echoes are ignored (they could arrive late and roll the Set back);
+ *    only changes written by another tab are applied. Every pass re-derives the DOM from
+ *    the Set, so Joget re-renders (renderBuilders, search, publish, undo) can't reopen groups.
  *    While Joget's search (or a tag filter / usages view) is active, nothing is collapsed,
  *    so every group with matches is visible; the saved state is left untouched.
  *
@@ -35,12 +39,17 @@
   const HEADER_CLASS = "jskin-group-header";
   const IDX_ATTR = "data-jskin-idx";
   const EMPTY_LABEL = "（无表名）";
-  const COLLAPSE_KEY = "jogetSkinComposerCollapsed";
+  const LEGACY_COLLAPSE_KEY = "jogetSkinComposerCollapsed"; // v1.3.3: { appId: [table] }
   const COLLAPSED_ITEM = "jskin-collapsed-item";
   const TITLE_BTNS_CLASS = "jskin-title-btns";
   const APP_ID = (location.pathname.match(/\/console\/app\/([^/]+)\//) || [])[1] || "";
 
-  let collapsedMap = {};     // { appId: [table, ...] }
+  const COLLAPSE_KEY = LEGACY_COLLAPSE_KEY + ":" + APP_ID;
+  const TAB_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+  let collapsed = new Set(); // tables collapsed in this app (source of truth)
+  let collapseTouched = false; // user changed it before the initial storage read finished
+  let writeSeq = 0;
 
   let showOthers = false;
   let busy = false;          // true while we mutate the DOM ourselves
@@ -236,15 +245,14 @@
 
   /* ---------- 3. collapse / expand ---------- */
   function collapsedSet() {
-    return new Set(collapsedMap[APP_ID] || []);
+    return new Set(collapsed);
   }
 
   function saveCollapsed(set) {
-    collapsedMap = Object.assign({}, collapsedMap, { [APP_ID]: Array.from(set) });
-    if (set.size === 0) {
-      delete collapsedMap[APP_ID];
-    }
-    browser.storage.local.set({ [COLLAPSE_KEY]: collapsedMap });
+    collapsed = new Set(set);
+    collapseTouched = true;
+    const rec = { tables: Array.from(collapsed), tab: TAB_ID, seq: ++writeSeq };
+    browser.storage.local.set({ [COLLAPSE_KEY]: rec }).catch(() => {});
     schedule();
   }
 
@@ -262,18 +270,21 @@
     const set = collapsedSet();
     const off = filtering();
     let changed = false;
-    let collapsed = false;
+    let isCollapsed = false;
     for (const el of ul.children) {
       if (el.classList.contains(HEADER_CLASS)) {
-        collapsed = !off && set.has(el.getAttribute("data-jskin-table"));
-        if (el.classList.contains("jskin-collapsed") !== collapsed) {
-          el.classList.toggle("jskin-collapsed", collapsed);
-          el.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        isCollapsed = !off && set.has(el.getAttribute("data-jskin-table"));
+        if (el.classList.contains("jskin-collapsed") !== isCollapsed) {
+          el.classList.toggle("jskin-collapsed", isCollapsed);
           changed = true;
         }
+        const aria = isCollapsed ? "false" : "true";
+        if (el.getAttribute("aria-expanded") !== aria) {
+          el.setAttribute("aria-expanded", aria);
+        }
       } else if (el.classList.contains("item")) {
-        if (el.classList.contains(COLLAPSED_ITEM) !== collapsed) {
-          el.classList.toggle(COLLAPSED_ITEM, collapsed);
+        if (el.classList.contains(COLLAPSED_ITEM) !== isCollapsed) {
+          el.classList.toggle(COLLAPSED_ITEM, isCollapsed);
           changed = true;
         }
       }
@@ -379,10 +390,10 @@
         }
       }
     } finally {
-      // let our own mutations flush before listening again
-      setTimeout(() => {
-        busy = false;
-      }, 0);
+      // Drop the records of our own mutations synchronously. (The old setTimeout(0)
+      // window also swallowed Joget mutations that landed in it, e.g. a re-render.)
+      observer.takeRecords();
+      busy = false;
     }
   }
 
@@ -395,11 +406,12 @@
 
   /* ---------- observers ---------- */
   // Joget re-renders #builders (switching views, search, add/delete items).
-  new MutationObserver(() => {
+  const observer = new MutationObserver(() => {
     if (!busy) {
       schedule();
     }
-  }).observe(document.body || ROOT, {
+  });
+  observer.observe(document.body || ROOT, {
     childList: true,
     subtree: true,
     attributes: true,
@@ -416,10 +428,17 @@
     if (changes[SHOW_KEY]) {
       showOthers = changes[SHOW_KEY].newValue === true;
     }
+    let collapseChanged = false;
     if (changes[COLLAPSE_KEY]) {
-      collapsedMap = changes[COLLAPSE_KEY].newValue || {};
+      const rec = changes[COLLAPSE_KEY].newValue;
+      // Ignore echoes of our own writes: they can arrive after a newer local change
+      // and would roll the Set back (= groups "re-open by themselves").
+      if (!rec || rec.tab !== TAB_ID) {
+        collapsed = new Set((rec && rec.tables) || []);
+        collapseChanged = true;
+      }
     }
-    if (changes[SHOW_KEY] || changes[COLLAPSE_KEY]) {
+    if (changes[SHOW_KEY] || collapseChanged) {
       schedule();
     }
   });
@@ -431,9 +450,19 @@
     }
   }, true);
 
-  browser.storage.local.get({ [SHOW_KEY]: false, [COLLAPSE_KEY]: {} }).then((r) => {
+  browser.storage.local.get([SHOW_KEY, COLLAPSE_KEY, LEGACY_COLLAPSE_KEY]).then((r) => {
     showOthers = r[SHOW_KEY] === true;
-    collapsedMap = r[COLLAPSE_KEY] || {};
+    if (!collapseTouched) {
+      // the user may already have clicked before this read finished; never overwrite that
+      const rec = r[COLLAPSE_KEY];
+      const legacy = r[LEGACY_COLLAPSE_KEY] && r[LEGACY_COLLAPSE_KEY][APP_ID];
+      if (rec && Array.isArray(rec.tables)) {
+        collapsed = new Set(rec.tables);
+      } else if (Array.isArray(legacy)) {
+        collapsed = new Set(legacy); // migrate v1.3.3 shared map
+        saveCollapsed(collapsed);
+      }
+    }
     schedule();
   });
 })();
