@@ -443,3 +443,12 @@ html.joget-skin.joget-skin-theme-indigo #builders .builder-type ul > li.jskin-gr
 html.joget-skin.joget-skin-theme-indigo #builders .builder-type ul > li.jskin-group-header .jskin-group-count { color: var(--js-muted); }
 /* v1.3.2 compact rows: hover-ID chip matches the indigo row hover fill */
 html.joget-skin.joget-skin-theme-indigo #builders .builder-type ul > li.item:hover > a.item-link .item-id { background: var(--js-surface-3) !important; }
+/* v1.3.3 collapse/expand-all buttons: same look as the indigo "+" button */
+html.joget-skin.joget-skin-theme-indigo #builders .builder-title .jskin-title-btn {
+  background-color: var(--js-surface) !important;
+  border: 1px solid var(--js-border) !important;
+  border-radius: var(--js-radius-sm) !important;
+  color: var(--js-text-2) !important;
+}
+html.joget-skin.joget-skin-theme-indigo #builders .builder-title .jskin-title-btn:hover { border-color: var(--js-accent) !important; color: var(--js-accent) !important; }
+html.joget-skin.joget-skin-theme-indigo #builders .builder-type ul > li.jskin-group-header:hover { color: var(--js-accent); }

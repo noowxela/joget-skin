@@ -1,5 +1,5 @@
 /*
- * Joget Skin — builder.css  (v1.3.2)
+ * Joget Skin — builder.css  (v1.3.3)
  * Target: Joget DX 9 (verified on DX Enterprise 9.1.2.2, build ee559cd).
  * Applies to /jw/web/console/*  (App Composer, Form / List / UI / Process Builder, web console).
  * The builder canvas iframe (/jw/builder/blank.jsp) is NOT matched on purpose.
@@ -103,9 +103,34 @@ html.joget-skin #builders .builder-type ul > li.jskin-group-header {
   color: #888;
   font-size: 12px;
   font-weight: 600;
-  cursor: default;
-  pointer-events: none;
+  cursor: pointer;
+  user-select: none;
 }
+html.joget-skin #builders .builder-type ul > li.jskin-group-header:hover { color: #555; }
+html.joget-skin #builders .builder-type ul > li.jskin-group-header .jskin-chevron {
+  width: 12px;
+  transition: transform 120ms ease;
+}
+html.joget-skin #builders .builder-type ul > li.jskin-group-header.jskin-collapsed .jskin-chevron { transform: rotate(-90deg); }
+html.joget-skin #builders .builder-type ul > li.item.jskin-collapsed-item { display: none !important; }
+
+/* "全部收起 / 全部展开" buttons next to Form Builder's "+" (same look as Joget's .addnew) */
+html.joget-skin #builders .builder-title .jskin-title-btn {
+  position: absolute;
+  top: 10px;
+  height: 27px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background-color: #eee;
+  color: #000;
+  font-size: 120%;
+  line-height: 27px;
+  cursor: pointer;
+  text-decoration: none;
+}
+html.joget-skin #builders .builder-title .jskin-expand-all { right: 49px; }
+html.joget-skin #builders .builder-title .jskin-collapse-all { right: 83px; }
+html:not(.joget-skin) .jskin-title-btns { display: none !important; }
 html.joget-skin #builders .builder-type ul > li.jskin-group-header:first-child { margin-top: 0; }
 html.joget-skin #builders .builder-type ul > li.jskin-group-header .jskin-group-count {
   margin-left: auto;

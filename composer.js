@@ -8,6 +8,11 @@
  * 2. Groups Form Builder items by their table name (.item-sublabel) under small
  *    headers. Existing <li> nodes are MOVED (never cloned), so Joget's delegated
  *    click / hover / actions handlers on #builder_canvas keep working.
+ * 3. Group headers are clickable (chevron) to collapse/expand one group; two buttons
+ *    next to Form Builder's "+" collapse / expand all groups. Collapsed tables are saved
+ *    per app in browser.storage.local "jogetSkinComposerCollapsed" = { appId: [table, ...] }.
+ *    While Joget's search (or a tag filter / usages view) is active, nothing is collapsed,
+ *    so every group with matches is visible; the saved state is left untouched.
  *
  * Everything is active only while <html> has class "joget-skin" (set by content.js
  * from the popup's on/off switch). When the skin is off, the button is removed,
@@ -30,6 +35,12 @@
   const HEADER_CLASS = "jskin-group-header";
   const IDX_ATTR = "data-jskin-idx";
   const EMPTY_LABEL = "（无表名）";
+  const COLLAPSE_KEY = "jogetSkinComposerCollapsed";
+  const COLLAPSED_ITEM = "jskin-collapsed-item";
+  const TITLE_BTNS_CLASS = "jskin-title-btns";
+  const APP_ID = (location.pathname.match(/\/console\/app\/([^/]+)\//) || [])[1] || "";
+
+  let collapsedMap = {};     // { appId: [table, ...] }
 
   let showOthers = false;
   let busy = false;          // true while we mutate the DOM ourselves
@@ -127,7 +138,10 @@
     const h = document.createElement("li");
     h.className = HEADER_CLASS;
     h.setAttribute("data-jskin-table", table);
-    h.setAttribute("aria-hidden", "true");
+    h.setAttribute("role", "button");
+    h.setAttribute("tabindex", "0");
+    const chevron = document.createElement("i");
+    chevron.className = "las la-angle-down jskin-chevron";
     const icon = document.createElement("i");
     icon.className = "las la-table";
     const name = document.createElement("span");
@@ -136,7 +150,24 @@
     const cnt = document.createElement("span");
     cnt.className = "jskin-group-count";
     cnt.textContent = String(count);
-    h.append(icon, name, cnt);
+    h.append(chevron, icon, name, cnt);
+    const toggle = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const set = collapsedSet();
+      if (set.has(table)) {
+        set.delete(table);
+      } else {
+        set.add(table);
+      }
+      saveCollapsed(set);
+    };
+    h.addEventListener("click", toggle);
+    h.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        toggle(e);
+      }
+    });
     return h;
   }
 
@@ -198,8 +229,103 @@
     const others = Array.from(ul.children).filter((c) => !c.hasAttribute(IDX_ATTR));
     items.forEach((li) => ul.append(li));
     others.forEach((c) => ul.append(c));
+    items.forEach((li) => li.classList.remove(COLLAPSED_ITEM));
     ul.removeAttribute("data-jskin-grouped");
     ul.classList.remove("jskin-grouped");
+  }
+
+  /* ---------- 3. collapse / expand ---------- */
+  function collapsedSet() {
+    return new Set(collapsedMap[APP_ID] || []);
+  }
+
+  function saveCollapsed(set) {
+    collapsedMap = Object.assign({}, collapsedMap, { [APP_ID]: Array.from(set) });
+    if (set.size === 0) {
+      delete collapsedMap[APP_ID];
+    }
+    browser.storage.local.set({ [COLLAPSE_KEY]: collapsedMap });
+    schedule();
+  }
+
+  // Joget search text, a tag filter or the usages view => show all groups (don't collapse)
+  function filtering() {
+    const input = document.querySelector("#builder_canvas .search-container > input");
+    return (
+      (input && input.value.trim() !== "") ||
+      !!document.querySelector("#builder_canvas .sub-search") ||
+      document.body.classList.contains("show-usages-mode")
+    );
+  }
+
+  function applyCollapse(ul) {
+    const set = collapsedSet();
+    const off = filtering();
+    let changed = false;
+    let collapsed = false;
+    for (const el of ul.children) {
+      if (el.classList.contains(HEADER_CLASS)) {
+        collapsed = !off && set.has(el.getAttribute("data-jskin-table"));
+        if (el.classList.contains("jskin-collapsed") !== collapsed) {
+          el.classList.toggle("jskin-collapsed", collapsed);
+          el.setAttribute("aria-expanded", collapsed ? "false" : "true");
+          changed = true;
+        }
+      } else if (el.classList.contains("item")) {
+        if (el.classList.contains(COLLAPSED_ITEM) !== collapsed) {
+          el.classList.toggle(COLLAPSED_ITEM, collapsed);
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  function makeTitleBtn(cls, icon, label, onClick) {
+    const a = document.createElement("a");
+    a.className = "jskin-title-btn " + cls;
+    a.setAttribute("role", "button");
+    a.setAttribute("aria-label", label);
+    a.title = label; // static label, so no stale-tooltip problem
+    const i = document.createElement("i");
+    i.className = icon;
+    a.append(i);
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onClick();
+    });
+    return a;
+  }
+
+  function ensureTitleButtons() {
+    const title = document.querySelector("#builders > .builder-type.builder-form > .builder-title");
+    const existing = document.querySelector("." + TITLE_BTNS_CLASS);
+    if (!skinOn() || !title) {
+      if (existing) {
+        existing.remove();
+      }
+      return;
+    }
+    if (existing && existing.parentElement === title) {
+      return;
+    }
+    if (existing) {
+      existing.remove();
+    }
+    const wrap = document.createElement("span");
+    wrap.className = TITLE_BTNS_CLASS;
+    wrap.append(
+      makeTitleBtn("jskin-collapse-all", "las la-angle-double-up", "全部收起", () => {
+        const ul = formList();
+        const tables = ul
+          ? Array.from(ul.querySelectorAll(":scope > ." + HEADER_CLASS)).map((h) => h.getAttribute("data-jskin-table"))
+          : [];
+        saveCollapsed(new Set(tables));
+      }),
+      makeTitleBtn("jskin-expand-all", "las la-angle-double-down", "全部展开", () => saveCollapsed(new Set()))
+    );
+    title.append(wrap);
   }
 
   // Hide a header when Joget's search / usage filter hides every item in its group.
@@ -219,7 +345,10 @@
         flush();
         header = el;
         visible = 0;
-      } else if (el.classList.contains("item") && getComputedStyle(el).display !== "none") {
+      } else if (
+        el.classList.contains("item") &&
+        (el.classList.contains(COLLAPSED_ITEM) || getComputedStyle(el).display !== "none")
+      ) {
         visible++;
       }
     }
@@ -233,15 +362,19 @@
     try {
       applyHideClass();
       ensureButton();
+      ensureTitleButtons();
       const ul = formList();
       if (ul) {
         const before = ul.getAttribute("data-jskin-grouped");
+        let changed = false;
         if (skinOn()) {
           group(ul);
+          changed = applyCollapse(ul);
+          updateHeaderVisibility(ul);
         } else if (ul.classList.contains("jskin-grouped")) {
           ungroup(ul);
         }
-        if (before !== ul.getAttribute("data-jskin-grouped")) {
+        if (changed || before !== ul.getAttribute("data-jskin-grouped")) {
           relayout();
         }
       }
@@ -277,14 +410,30 @@
   new MutationObserver(schedule).observe(ROOT, { attributes: true, attributeFilter: ["class"] });
 
   browser.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes[SHOW_KEY]) {
+    if (area !== "local") {
+      return;
+    }
+    if (changes[SHOW_KEY]) {
       showOthers = changes[SHOW_KEY].newValue === true;
+    }
+    if (changes[COLLAPSE_KEY]) {
+      collapsedMap = changes[COLLAPSE_KEY].newValue || {};
+    }
+    if (changes[SHOW_KEY] || changes[COLLAPSE_KEY]) {
       schedule();
     }
   });
 
-  browser.storage.local.get({ [SHOW_KEY]: false }).then((r) => {
+  // search box typing (Joget filters on keyup); re-evaluate collapse
+  document.addEventListener("input", (e) => {
+    if (e.target && e.target.closest && e.target.closest("#builder_canvas .canvas-header")) {
+      schedule();
+    }
+  }, true);
+
+  browser.storage.local.get({ [SHOW_KEY]: false, [COLLAPSE_KEY]: {} }).then((r) => {
     showOthers = r[SHOW_KEY] === true;
+    collapsedMap = r[COLLAPSE_KEY] || {};
     schedule();
   });
 })();

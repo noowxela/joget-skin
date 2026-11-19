@@ -1,0 +1,10 @@
+{
+  "name": "joget-skin",
+  "version": "1.3.3",
+  "private": true,
+  "description": "Firefox extension: declutter + layout tweaks for Joget DX 9 (local use).",
+  "scripts": {
+    "lint": "npx --yes web-ext lint --source-dir . --ignore-files \"screenshots/**\" \"themes/v1.1-indigo/**\" \"*.zip\" \"node_modules/**\" \"sign.sh\" \"package.json\" \".env.example\"",
+    "sign": "bash ./sign.sh"
+  }
+}
