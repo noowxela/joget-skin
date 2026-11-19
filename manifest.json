@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Joget Skin (builder + userview)",
-  "version": "1.1.0",
-  "description": "Modern clean skin for Joget DX 9 builders, App Composer, web console and userview pages (toggleable).",
+  "version": "1.2.0",
+  "description": "Declutter tweaks and (future) layout changes for Joget DX 9 builders and userview pages (toggleable).",
   "browser_specific_settings": {
     "gecko": {
       "id": "joget-skin@local.dev",

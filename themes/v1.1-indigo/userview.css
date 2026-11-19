@@ -1,0 +1,338 @@
+/*
+ * Joget Skin — userview.css
+ * Verified against Joget DX Enterprise 9.1.2.2 (build ee559cd), DX9 "Universal" theme, 2026-11-19.
+ *
+ * Applies to runtime apps:
+ *   /jw/web/userview/{appId}/{userviewId}/{key}/{menuId}     e.g. /jw/web/userview/crm/crm_userview_sales/_/account_list
+ *   /jw/web/embed/userview/...  and  ...?embed=true (iframes inside dashboards)
+ *   App Center itself is a userview: /jw/web/userview/appcenter/home/_/home
+ *
+ * Strategy: DX9 themes are driven by CSS variables (--theme-*, --primaryColor1..5,
+ * --jgt-*). We override those first (cheap, consistent), then polish a few components
+ * (header, menu, breadcrumb, datalist tables, filters, forms, buttons).
+ * NOTE: this replaces each app's own brand colours with the skin colours. If you want an
+ * app's original colours back, delete section 2.
+ *
+ * Everything is scoped under html.joget-skin (toolbar toggle removes that class).
+ */
+
+/* ============================================================
+ * 1. THEME TOKENS — change these to retheme
+ * ============================================================ */
+html.joget-skin {
+  --uv-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+
+  --uv-bg: #f6f7f9;
+  --uv-surface: #ffffff;
+  --uv-surface-2: #f9fafb;
+  --uv-surface-3: #f1f3f5;
+  --uv-border: #e6e8eb;
+  --uv-border-strong: #d4d8dd;
+
+  --uv-text: #111827;
+  --uv-text-2: #374151;
+  --uv-muted: #6b7280;
+
+  --uv-accent: #4f46e5;
+  --uv-accent-rgb: 79, 70, 229;
+  --uv-accent-hover: #4338ca;
+  --uv-accent-soft: rgba(79, 70, 229, 0.08);
+  --uv-accent-ring: rgba(79, 70, 229, 0.25);
+  --uv-on-accent: #ffffff;
+  --uv-danger: #dc2626;
+
+  --uv-radius: 10px;
+  --uv-radius-sm: 6px;
+  --uv-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --uv-shadow-lg: 0 8px 24px rgba(16, 24, 40, 0.10);
+  --uv-transition: 120ms ease;
+
+  /* DX9 theme accent scale (normally set inline on :root per app) */
+  --primaryColor1: var(--uv-accent) !important;
+  --primaryColor2: var(--uv-accent-soft) !important;
+  --primaryColor3: rgba(var(--uv-accent-rgb), 0.5) !important;
+  --primaryColor4: rgba(var(--uv-accent-rgb), 0.8) !important;
+  --primaryColor5: var(--uv-accent) !important;
+  /* Bootstrap (jgt-prefixed) accents */
+  --jgt-primary: var(--uv-accent) !important;
+  --jgt-primary-rgb: var(--uv-accent-rgb) !important;
+  --jgt-link-color: var(--uv-accent) !important;
+  --jgt-link-color-rgb: var(--uv-accent-rgb) !important;
+  --jgt-link-hover-color: var(--uv-accent-hover) !important;
+  --jgt-primary-bg-subtle: var(--uv-accent-soft) !important;
+}
+
+/* ============================================================
+ * 2. DX9 THEME VARIABLES (set on body.<theme-mode> by Joget)
+ * ============================================================ */
+html.joget-skin body {
+  --theme-background: var(--uv-bg) !important;
+  --theme-content-background: var(--uv-surface) !important;
+  --theme-header: var(--uv-surface) !important;
+  --theme-header-font: var(--uv-text) !important;
+  --theme-sidebar: var(--uv-surface) !important;
+  --theme-sidebar-link-bg: transparent !important;
+  --theme-sidebar-link: var(--uv-text-2) !important;
+  --theme-sidebar-icon: var(--uv-muted) !important;
+  --theme-sidebar-active-link-bg: var(--uv-accent-soft) !important;
+  --theme-sidebar-active-link: var(--uv-accent) !important;
+  --theme-sidebar-active-icon: var(--uv-accent) !important;
+  --theme-sidebar-badge: var(--uv-accent) !important;
+  --theme-sidebar-badge-text: var(--uv-on-accent) !important;
+  --theme-submenu-bg: var(--uv-surface) !important;
+  --theme-submenu-link: var(--uv-text-2) !important;
+  --theme-submenu-icon: var(--uv-muted) !important;
+  --theme-submenu-active-link-bg: var(--uv-accent-soft) !important;
+  --theme-submenu-active-link: var(--uv-accent) !important;
+  --theme-submenu-active-icon: var(--uv-accent) !important;
+  --theme-border-color: var(--uv-border) !important;
+  --theme-footer-bg: transparent !important;
+  --theme-footer: var(--uv-muted) !important;
+  --jgt-tpgh-colorLink: var(--uv-accent) !important;
+  --jgt-tpgh-colorLinkHover: var(--uv-accent-hover) !important;
+  --jgt-tpgh-colorLinkActive: var(--uv-accent-hover) !important;
+  --jgt-tpgh-colorText: var(--uv-text) !important;
+  --jgt-tpgh-colorTextHeading: var(--uv-text) !important;
+  --jgt-tpgh-colorTextDescription: var(--uv-muted) !important;
+
+  font-family: var(--uv-font) !important;
+  color: var(--uv-text);
+  background-color: var(--uv-bg) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+html.joget-skin ::placeholder { color: var(--uv-muted) !important; opacity: 1; }
+html.joget-skin ::selection { background: var(--uv-accent-ring); }
+
+/* ============================================================
+ * 3. HEADER  (header.navbar) + MENU (#sidebar > nav#navigation > ul#category-container)
+ * ============================================================ */
+html.joget-skin header.navbar {
+  background-color: var(--uv-surface) !important;
+  border-bottom: 1px solid var(--uv-border) !important;
+  box-shadow: none !important;
+}
+html.joget-skin #header-link .brand-text { color: var(--uv-text) !important; font-weight: 700; letter-spacing: -0.02em; }
+html.joget-skin #welcomeMessage { color: var(--uv-muted) !important; }
+html.joget-skin header.navbar .header-nav a.btn { color: var(--uv-text-2) !important; border-radius: var(--uv-radius-sm) !important; }
+html.joget-skin header.navbar .header-nav a.btn:hover { background-color: var(--uv-surface-3) !important; }
+html.joget-skin header.navbar .badge { background-color: var(--uv-accent) !important; }
+
+/* Horizontal menu (body.horizontal_menu) and vertical sidebar both use #category-container */
+html.joget-skin #sidebar { background-color: var(--uv-surface) !important; border-color: var(--uv-border) !important; }
+html.joget-skin body.horizontal_menu #sidebar { border-bottom: 1px solid var(--uv-border) !important; }
+html.joget-skin #category-container > li > a,
+html.joget-skin #category-container > li > a span,
+html.joget-skin #category-container > li > a i {
+  color: var(--uv-text-2) !important;
+}
+html.joget-skin #category-container > li > a { transition: color var(--uv-transition), background-color var(--uv-transition); }
+html.joget-skin #category-container > li > a:hover { background-color: var(--uv-surface-3) !important; }
+html.joget-skin #category-container > li.active > a,
+html.joget-skin #category-container > li.active > a span,
+html.joget-skin #category-container > li.active > a i {
+  color: var(--uv-accent) !important;
+  font-weight: 600;
+}
+/* active underline in horizontal mode */
+html.joget-skin body.horizontal_menu #category-container > li.active > a { box-shadow: inset 0 -2px 0 var(--uv-accent) !important; }
+html.joget-skin #category-container .badge.rowCount {
+  background-color: var(--uv-surface-3) !important;
+  color: var(--uv-text-2) !important;
+  border-radius: 999px !important;
+}
+/* dropdown submenus */
+html.joget-skin #category-container .menu-container,
+html.joget-skin #category-container ul.dropdown-menu {
+  background-color: var(--uv-surface) !important;
+  border: 1px solid var(--uv-border) !important;
+  border-radius: var(--uv-radius) !important;
+  box-shadow: var(--uv-shadow-lg) !important;
+}
+
+/* ============================================================
+ * 4. PAGE: breadcrumb, heading, content card
+ * ============================================================ */
+html.joget-skin .breadcrumb,
+html.joget-skin .breadcrumb a { color: var(--uv-muted) !important; font-size: 13px; }
+html.joget-skin .breadcrumb a:hover { color: var(--uv-accent) !important; }
+html.joget-skin .page-heading { color: var(--uv-text) !important; letter-spacing: -0.01em; }
+html.joget-skin .main-body-content.main-component {
+  background-color: var(--uv-surface) !important;
+  border: 1px solid var(--uv-border) !important;
+  border-radius: var(--uv-radius) !important;
+  box-shadow: var(--uv-shadow) !important;
+}
+html.joget-skin a { color: var(--uv-accent); }
+
+/* ============================================================
+ * 5. BUTTONS
+ * ============================================================ */
+html.joget-skin .btn,
+html.joget-skin .form-button,
+html.joget-skin input[type="button"],
+html.joget-skin input[type="submit"],
+html.joget-skin button.button {
+  border-radius: var(--uv-radius-sm) !important;
+  font-weight: 500;
+  transition: background-color var(--uv-transition), border-color var(--uv-transition), color var(--uv-transition);
+}
+html.joget-skin .btn-primary,
+html.joget-skin .form-button.btn-primary,
+html.joget-skin input[type="submit"].btn-primary,
+html.joget-skin .actions button.form-button:not(.btn-danger):not(.btn-secondary),
+html.joget-skin .datalist-body-content td a.btn-primary {
+  background-color: var(--uv-accent) !important;
+  border-color: var(--uv-accent) !important;
+  color: var(--uv-on-accent) !important;
+  box-shadow: var(--uv-shadow);
+}
+html.joget-skin .btn-primary:hover,
+html.joget-skin .actions button.form-button:not(.btn-danger):not(.btn-secondary):hover {
+  background-color: var(--uv-accent-hover) !important;
+  border-color: var(--uv-accent-hover) !important;
+}
+html.joget-skin .btn-secondary,
+html.joget-skin .btn-default {
+  background-color: var(--uv-surface) !important;
+  border: 1px solid var(--uv-border-strong) !important;
+  color: var(--uv-text-2) !important;
+}
+html.joget-skin .btn-secondary:hover,
+html.joget-skin .btn-default:hover { background-color: var(--uv-surface-2) !important; }
+/* destructive buttons: outlined red instead of solid */
+html.joget-skin .btn-danger {
+  background-color: var(--uv-surface) !important;
+  border: 1px solid #fecaca !important;
+  color: var(--uv-danger) !important;
+}
+html.joget-skin .btn-danger:hover { background-color: #fef2f2 !important; }
+html.joget-skin .btn:focus-visible { box-shadow: 0 0 0 3px var(--uv-accent-ring) !important; }
+
+/* ============================================================
+ * 6. INPUTS
+ * ============================================================ */
+html.joget-skin input[type="text"],
+html.joget-skin input[type="password"],
+html.joget-skin input[type="search"],
+html.joget-skin input[type="number"],
+html.joget-skin input[type="email"],
+html.joget-skin input[type="tel"],
+html.joget-skin input[type="date"],
+html.joget-skin select,
+html.joget-skin textarea,
+html.joget-skin .form-control,
+html.joget-skin .chosen-container .chosen-single,
+html.joget-skin .select2-container .select2-selection {
+  border: 1px solid var(--uv-border-strong) !important;
+  border-radius: var(--uv-radius-sm) !important;
+  background-color: var(--uv-surface) !important;
+  color: var(--uv-text) !important;
+  box-shadow: none !important;
+  transition: border-color var(--uv-transition), box-shadow var(--uv-transition);
+}
+html.joget-skin input:focus,
+html.joget-skin select:focus,
+html.joget-skin textarea:focus,
+html.joget-skin .form-control:focus {
+  border-color: var(--uv-accent) !important;
+  box-shadow: 0 0 0 3px var(--uv-accent-ring) !important;
+  outline: none !important;
+}
+html.joget-skin input[type="checkbox"],
+html.joget-skin input[type="radio"] { accent-color: var(--uv-accent); }
+
+/* ============================================================
+ * 7. DATALIST  (.dataList > .filters + .actions + .table-wrapper > table + .pagelinks)
+ * ============================================================ */
+html.joget-skin .dataList table {
+  border-collapse: separate !important;
+  border-spacing: 0;
+  background-color: var(--uv-surface) !important;
+}
+html.joget-skin .dataList table thead th {
+  background-color: var(--uv-surface-2) !important;
+  color: var(--uv-muted) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--uv-border) !important;
+}
+html.joget-skin .dataList table thead th a { color: var(--uv-muted) !important; }
+html.joget-skin .dataList table thead th:first-child { border-top-left-radius: var(--uv-radius-sm) !important; }
+html.joget-skin .dataList table thead th:last-child { border-top-right-radius: var(--uv-radius-sm) !important; }
+/* Row-action links (td.row_action a) keep whatever the app styled them as (often a filled button). */
+html.joget-skin .dataList table tbody td {
+  border-color: var(--uv-border) !important;
+  color: var(--uv-text-2);
+}
+html.joget-skin .dataList table tbody tr { transition: background-color var(--uv-transition); }
+html.joget-skin .dataList table tbody tr:hover td { background-color: var(--uv-surface-2) !important; }
+html.joget-skin .dataList table tbody td:not(.row_action) a:not(.btn) { color: var(--uv-accent) !important; font-weight: 500; text-decoration: none; }
+html.joget-skin .dataList .pagebanner { color: var(--uv-muted) !important; }
+html.joget-skin .dataList .exportlinks,
+html.joget-skin .dataList .exportlinks a { color: var(--uv-muted) !important; }
+html.joget-skin .dataList .exportlinks a:hover { color: var(--uv-accent) !important; }
+html.joget-skin .dataList .pagelinks a,
+html.joget-skin .dataList .pagelinks strong {
+  border-radius: var(--uv-radius-sm) !important;
+  border-color: var(--uv-border) !important;
+}
+html.joget-skin .dataList .pagelinks strong {
+  background-color: var(--uv-accent) !important;
+  border-color: var(--uv-accent) !important;
+  color: var(--uv-on-accent) !important;
+}
+
+/* ============================================================
+ * 8. FORMS  (#form-canvas .form-section > .form-section-title + .form-column > .form-cell)
+ * ============================================================ */
+html.joget-skin .form-section {
+  background-color: var(--uv-surface) !important;
+  border-color: var(--uv-border) !important;
+  border-radius: var(--uv-radius) !important;
+}
+html.joget-skin .form-section-title {
+  background: transparent !important;
+  color: var(--uv-text) !important;
+  border-bottom: 1px solid var(--uv-border) !important;
+  font-weight: 600;
+}
+html.joget-skin .form-section-title span { color: var(--uv-text) !important; }
+html.joget-skin .form-cell > label.label,
+html.joget-skin .subform-cell > label.label { color: var(--uv-text-2) !important; font-weight: 500; }
+html.joget-skin .form-cell-validator { color: var(--uv-danger) !important; }
+html.joget-skin .form-error-message,
+html.joget-skin .form-error-cell { color: var(--uv-danger) !important; }
+
+/* ============================================================
+ * 9. CARDS / DASHBOARD / FOOTER / ADMIN BAR
+ *    Dashboard tiles often carry designer colours (builder-style-*); only soften borders.
+ * ============================================================ */
+html.joget-skin .card,
+html.joget-skin .main-body-content.Sql_Chart_Menu {
+  border-color: var(--uv-border) !important;
+  border-radius: var(--uv-radius) !important;
+}
+html.joget-skin footer,
+html.joget-skin #footerMessage,
+html.joget-skin #footerMessage a { color: var(--uv-muted) !important; background: transparent !important; }
+html.joget-skin #adminBar {
+  background-color: var(--uv-surface) !important;
+  border-top: 1px solid var(--uv-border);
+}
+html.joget-skin #adminBar .adminBarButton { color: var(--uv-text-2) !important; }
+
+/* ============================================================
+ * 10. OPT-IN / RISKIER TWEAKS — uncomment to try
+ * ============================================================ */
+/* Hide "Powered by Joget" footer:
+html.joget-skin footer #footer-message { display: none !important; }
+*/
+/* Hide the admin memory/analyzer text:
+html.joget-skin #adminBar .analyzer-page { display: none !important; }
+*/
+/* Roomier datalist rows (changes row height):
+html.joget-skin .dataList table tbody td { padding-top: 14px !important; padding-bottom: 14px !important; }
+*/
