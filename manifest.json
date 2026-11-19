@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Joget Skin (builder + userview)",
-  "version": "1.2.0",
-  "description": "Declutter tweaks and (future) layout changes for Joget DX 9 builders and userview pages (toggleable).",
+  "version": "1.3.0",
+  "description": "Declutter tweaks, App Composer layout and optional Indigo theme for Joget DX 9 builders and userview pages (toggleable).",
   "browser_specific_settings": {
     "gecko": {
       "id": "joget-skin@local.dev",
@@ -44,7 +44,8 @@
         "*://*/jw/web/console/*"
       ],
       "css": [
-        "builder.css"
+        "builder.css",
+        "themes/indigo/builder.css"
       ],
       "run_at": "document_start",
       "all_frames": true,
@@ -56,11 +57,22 @@
         "*://*/jw/web/embed/userview/*"
       ],
       "css": [
-        "userview.css"
+        "userview.css",
+        "themes/indigo/userview.css"
       ],
       "run_at": "document_start",
       "all_frames": true,
       "css_origin": "author"
+    },
+    {
+      "matches": [
+        "*://*/jw/web/console/app/*/builders*"
+      ],
+      "js": [
+        "composer.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ]
 }

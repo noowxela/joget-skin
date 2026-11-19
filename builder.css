@@ -1,11 +1,12 @@
 /*
- * Joget Skin — builder.css  (v1.2.0)
+ * Joget Skin — builder.css  (v1.3.0)
  * Target: Joget DX 9 (verified on DX Enterprise 9.1.2.2, build ee559cd).
  * Applies to /jw/web/console/*  (App Composer, Form / List / UI / Process Builder, web console).
  * The builder canvas iframe (/jw/builder/blank.jsp) is NOT matched on purpose.
  *
  * Joget keeps its ORIGINAL look: no colour / font / radius / theme changes here.
- * The old full indigo theme (v1.1.0) is in themes/v1.1-indigo/ and git tag v1.1.0.
+ * Optional colour theme: themes/indigo/builder.css (popup → 主题 → Indigo), scoped under
+ * html.joget-skin.joget-skin-theme-indigo. Original v1.1 files: themes/v1.1-indigo/, tag v1.1.0.
  *
  * Everything is scoped under html.joget-skin (the toolbar toggle removes that class).
  * Selector reference: see the knowledge note "Firefox 扩展改 Joget CSS.md".
@@ -48,3 +49,73 @@ html.joget-skin #left-panel .components-list ol > li > .builder-palette-element 
  *    Do NOT change position/size/transform on #builder_canvas, #element-select-box,
  *    #lf-container (process canvas) or drag sources unless tested with drag/drop.
  * ============================================================ */
+
+/* ------------------------------------------------------------
+ * 2a. APP COMPOSER  (/jw/web/console/app/{app}/{ver}/builders)
+ *     Driven by composer.js, which sets on <html>:
+ *       .jskin-composer              composer layout active (skin on)
+ *       .jskin-composer-hide-others  only Form / List / UI / Process visible
+ *     Joget's own layout: #builders is a CSS grid
+ *     (repeat(auto-fill, minmax(400px, 1fr)), row spans set by AppBuilder.resizeBuilders),
+ *     #builders-seperator > span are the vertical divider lines.
+ * ------------------------------------------------------------ */
+
+/* Hide every builder type except the 4 main ones (incl. Theme, AI Agent,
+ * Agent Eval, "Get More Plugins from Marketplace", any future plugin builders). */
+html.joget-skin.jskin-composer-hide-others #builders > .builder-type:not(.builder-form):not(.builder-datalist):not(.builder-userview):not(.builder-process) {
+  display: none !important;
+}
+
+/* 4 visible builders => 4 equal columns on wide screens (Joget default is 3 x 400px+). */
+@media (min-width: 1100px) {
+  html.joget-skin.jskin-composer-hide-others #builders {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+  /* Process Builder now sits in row 1: drop Joget's "second row" top border */
+  html.joget-skin.jskin-composer-hide-others #builders > div.builder-type {
+    border-top: 0 !important;
+    padding-top: 0 !important;
+  }
+  /* divider lines between the 4 columns (padding 15px, gap 10px) */
+  html.joget-skin.jskin-composer-hide-others #builders-seperator > span { display: none; }
+  html.joget-skin.jskin-composer-hide-others #builders-seperator > span:nth-child(-n+3) { display: block; }
+  html.joget-skin.jskin-composer-hide-others #builders-seperator > span:nth-child(1) { left: calc(15px + (100% - 60px) * 0.25 + 5px) !important; }
+  html.joget-skin.jskin-composer-hide-others #builders-seperator > span:nth-child(2) { left: calc(15px + (100% - 60px) * 0.5 + 15px) !important; }
+  html.joget-skin.jskin-composer-hide-others #builders-seperator > span:nth-child(3) { left: calc(15px + (100% - 60px) * 0.75 + 25px) !important; }
+}
+@media (max-width: 1099.98px) {
+  html.joget-skin.jskin-composer-hide-others #builders-seperator > span { display: none; }
+}
+
+/* Form Builder: table-name group headers inserted by composer.js (li.jskin-group-header).
+ * Joget-native look: muted grey, small, like the italic .item-sublabel text. */
+html.joget-skin #builders .builder-type ul > li.jskin-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  margin: 14px 0 4px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: #888;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: default;
+  pointer-events: none;
+}
+html.joget-skin #builders .builder-type ul > li.jskin-group-header:first-child { margin-top: 0; }
+html.joget-skin #builders .builder-type ul > li.jskin-group-header .jskin-group-count {
+  margin-left: auto;
+  font-weight: 400;
+  color: #aaa;
+}
+html.joget-skin #builders .builder-type ul > li.jskin-group-header + li.item { margin-top: 0; }
+html.joget-skin #builders .builder-type ul > li.jskin-group-header.jskin-group-empty { display: none; }
+/* the table name is now in the header, so the per-item sublabel is redundant */
+html.joget-skin #builders .builder-form ul.jskin-grouped > li.item > a .item-sublabel { display: none; }
+html.joget-skin #builders .builder-form ul.jskin-grouped > li.has-sublabel > a .item-label { max-width: none; }
+
+/* Toolbar button group is only shown while the skin is on (composer.js also removes it). */
+html:not(.joget-skin) #jskin-others-group { display: none !important; }
+

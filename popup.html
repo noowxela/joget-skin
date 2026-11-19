@@ -18,13 +18,43 @@
         gap: 8px;
         cursor: pointer;
       }
+      .theme-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 10px;
+        cursor: default;
+      }
+      select {
+        font: inherit;
+        padding: 2px 4px;
+      }
+      select:disabled {
+        opacity: 0.5;
+      }
       .hint {
         margin: 10px 0 0;
         color: #666;
         font-size: 12px;
       }
       @media (prefers-color-scheme: dark) {
-        .hint {
+        .theme-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 10px;
+        cursor: default;
+      }
+      select {
+        font: inherit;
+        padding: 2px 4px;
+      }
+      select:disabled {
+        opacity: 0.5;
+      }
+      .hint {
           color: #aaa;
         }
       }
@@ -35,7 +65,14 @@
       <input type="checkbox" id="toggle" />
       <span>启用 Joget Skin</span>
     </label>
-    <p class="hint">关闭后立即去掉 <code>html.joget-skin</code>，方便排查拖拽/布局问题。</p>
+    <label class="theme-row" for="theme">
+      <span>主题</span>
+      <select id="theme">
+        <option value="default">原本 (Joget 默认)</option>
+        <option value="indigo">Indigo</option>
+      </select>
+    </label>
+    <p class="hint">关闭后隐藏项、App Composer 布局和主题全部还原成 Joget 原样，不用刷新页面。</p>
     <script src="popup.js"></script>
   </body>
 </html>

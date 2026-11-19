@@ -1,10 +1,11 @@
 /*
- * Joget Skin — userview.css  (v1.2.0)
+ * Joget Skin — userview.css  (v1.3.0)
  * Target: Joget DX 9 (verified on DX Enterprise 9.1.2.2, build ee559cd).
  * Applies to /jw/web/userview/* and /jw/web/embed/userview/* (runtime apps, App Center).
  *
  * Joget keeps its ORIGINAL look: no colour / font / radius / theme changes here.
- * The old full indigo theme (v1.1.0) is in themes/v1.1-indigo/ and git tag v1.1.0.
+ * Optional colour theme: themes/indigo/userview.css (popup → 主题 → Indigo).
+ * Original v1.1 files: themes/v1.1-indigo/, tag v1.1.0.
  *
  * Everything is scoped under html.joget-skin (the toolbar toggle removes that class).
  */

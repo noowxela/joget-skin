@@ -1,32 +1,48 @@
 /**
- * Toggle class on <html> so injected CSS only applies when enabled.
- * Storage key: jogetSkinEnabled (default true).
+ * Sets classes on <html> so the injected CSS only applies when wanted:
+ *   joget-skin                 skin on (storage "jogetSkinEnabled", default true)
+ *   joget-skin-theme-indigo    Indigo theme (storage "jogetSkinTheme" === "indigo", default "default")
+ * The theme class is only set while the skin is on, so turning the skin off removes everything.
+ * Changes from the popup apply live via storage.onChanged (no reload needed).
  */
 (function () {
-  const CLASS_NAME = "joget-skin";
-  const STORAGE_KEY = "jogetSkinEnabled";
+  const SKIN_CLASS = "joget-skin";
+  const ENABLED_KEY = "jogetSkinEnabled";
+  const THEME_KEY = "jogetSkinTheme";
+  const THEMES = ["indigo"]; // class: joget-skin-theme-<name>
 
-  function applyEnabled(enabled) {
+  const state = { enabled: true, theme: "default" };
+
+  function apply() {
     const root = document.documentElement;
     if (!root) {
       return;
     }
-    if (enabled) {
-      root.classList.add(CLASS_NAME);
-    } else {
-      root.classList.remove(CLASS_NAME);
+    root.classList.toggle(SKIN_CLASS, state.enabled);
+    for (const t of THEMES) {
+      root.classList.toggle("joget-skin-theme-" + t, state.enabled && state.theme === t);
     }
   }
 
   // Apply as early as possible (run_at: document_start).
-  browser.storage.local.get({ [STORAGE_KEY]: true }).then((result) => {
-    applyEnabled(result[STORAGE_KEY] !== false);
+  browser.storage.local.get({ [ENABLED_KEY]: true, [THEME_KEY]: "default" }).then((r) => {
+    state.enabled = r[ENABLED_KEY] !== false;
+    state.theme = r[THEME_KEY] || "default";
+    apply();
   });
 
   browser.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local" || !changes[STORAGE_KEY]) {
+    if (areaName !== "local") {
       return;
     }
-    applyEnabled(changes[STORAGE_KEY].newValue !== false);
+    if (changes[ENABLED_KEY]) {
+      state.enabled = changes[ENABLED_KEY].newValue !== false;
+    }
+    if (changes[THEME_KEY]) {
+      state.theme = changes[THEME_KEY].newValue || "default";
+    }
+    if (changes[ENABLED_KEY] || changes[THEME_KEY]) {
+      apply();
+    }
   });
 })();
