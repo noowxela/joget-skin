@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- ears -->
+  <path d="M14 10 L52 40 L22 66 Z" fill="#E8641B"/>
+  <path d="M114 10 L76 40 L106 66 Z" fill="#E8641B"/>
+  <path d="M22 24 L44 42 L27 56 Z" fill="#3B1F12"/>
+  <path d="M106 24 L84 42 L101 56 Z" fill="#3B1F12"/>
+  <!-- head -->
+  <path d="M64 30 L104 44 L116 74 L64 120 L12 74 L24 44 Z" fill="#F07A2A"/>
+  <!-- white cheeks / muzzle -->
+  <path d="M12 74 L46 70 L64 96 L82 70 L116 74 L64 120 Z" fill="#FFF6EC" stroke="#E8641B" stroke-width="3" stroke-linejoin="round"/>
+  <!-- eyes -->
+  <path d="M38 62 Q46 55 54 62 Q46 66 38 62 Z" fill="#2A160C"/>
+  <path d="M90 62 Q82 55 74 62 Q82 66 90 62 Z" fill="#2A160C"/>
+  <!-- nose -->
+  <path d="M56 108 L72 108 L64 120 Z" fill="#2A160C"/>
+</svg>
