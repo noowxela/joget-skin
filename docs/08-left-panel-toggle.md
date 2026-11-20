@@ -24,3 +24,5 @@
 
 **排查**：点把手没反应 → Console 跑 `$("#left-panel-toogle").is(":visible")`，必须是 `true`。把手不见 → `<html>` 上有没有 `jskin-edge-handles`。快捷键无效 → 看 `browser.storage.local` 里的 `jogetSkinHotkeyLeftPanel`，以及 `<html>` 上是否卡着 `data-jskin-hk-recording`。
 测试：`left-panel handle: …`、`left-panel hotkey: …`。
+
+**v1.3.10**：Ctrl+[（可改）同时收起 / 展开左侧面板和 Quick Nav（`edgetoggles.js` 的 `toggleBoth()`）。测试：`hotkey Ctrl+[ toggles left panel and quick nav together`。

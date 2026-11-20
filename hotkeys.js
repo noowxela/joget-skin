@@ -170,7 +170,7 @@
       });
     }
     const tdl = el("td", "jskin-hk-label");
-    tdl.append(el("span", "", "收起 / 展开左侧面板"));
+    tdl.append(el("span", "", "收起 / 展开左侧面板和 Quick Nav"));
     const acts = el("span", "jskin-hk-acts");
     const edit = el("button", "jskin-hk-edit", recording ? "取消" : "修改");
     edit.type = "button";

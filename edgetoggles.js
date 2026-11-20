@@ -1,5 +1,5 @@
 /**
- * Joget Skin — edge handles (content script, top frame only).  v1.3.8
+ * Joget Skin — edge handles (content script, top frame only).  v1.3.10
  * Pages: every builder (/jw/web/console/app/{appId}/{ver}/{type}/builder/...).
  *
  * 1. Left panel: Joget's #left-panel-toogle lives inside #left-panel, which is
@@ -13,7 +13,8 @@
  *    (#jskin-qn-handle, same look as the left one) on the right edge opens / closes it
  *    (html.jskin-qn-pinned, remembered in localStorage). No hover reveal.
  *
- * 3. A hotkey (default Ctrl+[) toggles the left panel (same as clicking the handle).
+ * 3. A hotkey (default Ctrl+[) toggles the left panel AND the quick nav together (v1.3.10):
+ *    if either is open both close, otherwise both open, so they never end up out of step.
  *    Also caught inside the builder canvas iframe. Skipped inside CodeMirror (Ctrl+[ is
  *    "indent less" there) and while hotkeys.js is recording a new combo.
  *    The combo is user-editable in the hotkeys panel; stored in browser.storage.local
@@ -59,6 +60,23 @@
     requestAnimationFrame(sync);
   }
 
+  function setPinned(v) {
+    pinned = v;
+    try {
+      localStorage.setItem(PIN_KEY, pinned ? "1" : "0");
+    } catch (err) { /* ignore */ }
+    sync();
+  }
+
+  // hotkey: one combo for both edges; any open -> close both, else open both
+  function toggleBoth() {
+    const leftOpen = !document.body.classList.contains("left-panel-closed");
+    const hasQn = !!document.getElementById(QN_ID);
+    const open = !(leftOpen || (hasQn && pinned));
+    if (leftOpen !== open && document.getElementById("left-panel-toogle")) toggleLeft();
+    if (hasQn && pinned !== open) setPinned(open);
+  }
+
   const HK_KEY = "jogetSkinHotkeyLeftPanel";
   const HK_DEFAULT = { ctrl: true, meta: false, alt: false, shift: false, code: "BracketLeft", key: "[" };
   let combo = HK_DEFAULT;
@@ -82,7 +100,7 @@
     if (t && t.closest && t.closest(".CodeMirror, .cm-editor")) return;
     e.preventDefault();
     e.stopPropagation();
-    toggleLeft();
+    toggleBoth();
   }
   window.addEventListener("keydown", onKey, true);
   const hooked = new WeakSet();
@@ -138,11 +156,7 @@
       h.innerHTML = '<i class="las la-angle-left"></i>';
       h.addEventListener("click", (e) => {
         e.preventDefault();
-        pinned = !pinned;
-        try {
-          localStorage.setItem(PIN_KEY, pinned ? "1" : "0");
-        } catch (err) { /* ignore */ }
-        sync();
+        setPinned(!pinned);
       });
       document.body.append(h);
     }

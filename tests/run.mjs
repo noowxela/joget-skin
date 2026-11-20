@@ -338,6 +338,46 @@ test("left-panel hotkey: Ctrl+[ toggles; can be changed in the hotkeys panel", a
   return "Ctrl+[ toggles; Ctrl+S refused (clash); changed to Ctrl+Alt+K which toggles, old key no longer does";
 });
 
+test("hotkey Ctrl+[ toggles left panel and quick nav together", async (page) => {
+  await open(page, urls.textForm);
+  await inject(page);
+  // start state: left panel open, quick nav closed (earlier tests may have left it open)
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    if (document.documentElement.classList.contains("jskin-qn-pinned")) document.getElementById("jskin-qn-handle").click();
+    if (document.body.classList.contains("left-panel-closed")) document.getElementById("jskin-left-handle").click();
+    document.activeElement && document.activeElement.blur();
+  });
+  await page.waitForTimeout(600);
+  const st = () => page.evaluate(() => [
+    document.body.classList.contains("left-panel-closed") ? "L-closed" : "L-open",
+    Math.round(document.querySelector("#quick-nav-bar").getBoundingClientRect().width),
+  ].join("/"));
+  const s0 = await st();
+  const steps = [];
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press("Control+BracketLeft");
+    await page.waitForTimeout(600);
+    steps.push(await st());
+  }
+  // mixed start: left closed + quick nav open -> any open -> both close
+  await page.click("#jskin-qn-handle");
+  await page.waitForTimeout(500);
+  const mixed = await st();
+  await page.keyboard.press("Control+BracketLeft");
+  await page.waitForTimeout(600);
+  const afterMixed = await st();
+  await shot(page, "hotkey-both-closed");
+  await page.keyboard.press("Control+BracketLeft");
+  await page.waitForTimeout(600);
+  const restored = await st();
+  await page.evaluate(() => document.documentElement.classList.contains("jskin-qn-pinned") && document.getElementById("jskin-qn-handle").click());
+  assert(s0 === "L-open/0", "start " + s0);
+  assert(steps.join() === "L-closed/0,L-open/40,L-closed/0", "steps " + steps);
+  assert(mixed === "L-closed/40" && afterMixed === "L-closed/0" && restored === "L-open/40", [mixed, afterMixed, restored].join());
+  return [s0, ...steps, "mixed " + mixed + " -> " + afterMixed, restored].join(" -> ");
+});
+
 test("quick nav: hidden, no hover reveal, toggle button opens / closes", async (page) => {
   await open(page, urls.textForm);
   await inject(page);

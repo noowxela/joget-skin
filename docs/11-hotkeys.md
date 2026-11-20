@@ -28,7 +28,7 @@
 - ⌘ 当 Ctrl：`builder/jquery.hotkeys.js:169-170`。它把修饰键拼成 `shift+ctrl+z`，和绑定的 `ctrl+shift+z` 对不上，所以 ⌘⇧Z 不能重做。
 - 没列入：`fbuilder/dbuilder/ubuilder.properties` 里的 “Redo (Ctrl+Y)”、“Preview (Ctrl+P)” 是旧版 `js/cbuilder.core.js:144-170` 的，DX9 的 `base.jsp` 不加载它。Process Builder 的 LogicFlow 没有开 keyboard 插件（`pbuilder.js:240-265`）。
 
-**可修改的扩展快捷键（v1.3.8）**：面板最上面一组「Joget Skin 扩展加的（可修改）」，目前只有「收起 / 展开左侧面板」，默认 Ctrl+[。
+**可修改的扩展快捷键（v1.3.8）**：面板最上面一组「Joget Skin 扩展加的（可修改）」，目前只有「收起 / 展开左侧面板和 Quick Nav」，默认 Ctrl+[。v1.3.10 起这个键同时控制左侧面板和右边 Quick Nav：任意一个开着就两个都收起，两个都收着就两个都展开。
 - 点「修改」→ 显示「请按新组合键…」→ 直接按组合键。Esc 取消。
 - 必须带 Ctrl / ⌘ / Alt（或用 F1-F12），不然打字时会误触。
 - 和 Joget 的保存、撤销、重做、复制、粘贴冲突时会拒绝并提示。
