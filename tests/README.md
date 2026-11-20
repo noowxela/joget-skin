@@ -34,7 +34,7 @@ SHOTS=../joget-skin-shots node tests/run.mjs   # 顺便截图（失败时也会�
 | composer: …（4 个） | docs/05 |
 | save chime | docs/06 |
 | popup | docs/07 |
-| left-panel toggle | docs/08 |
+| left-panel handle、left-panel hotkey | docs/08、docs/11 |
 | quick nav | docs/09 |
 | canvas centred（form / datalist / userview / process）、element select box | docs/10 |
 | hotkeys: …（3 个） | docs/11 |

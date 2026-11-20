@@ -47,6 +47,11 @@
       ],
     },
     {
+      title: "Joget Skin 扩展加的（可修改）",
+      custom: true,
+      items: [],
+    },
+    {
       title: "Process Builder 画布",
       items: [
         [["Shift", "拖动"], "平移画布", "pbuilder/js/pbuilder.js:2066-2068"],
@@ -80,6 +85,118 @@
   const onPage = () => PAGE_RE.test(location.pathname);
 
   let panel = null;
+
+  /* ---------- editable extension hotkey (edgetoggles.js reads the same storage key) ---------- */
+  const HK_KEY = "jogetSkinHotkeyLeftPanel";
+  const HK_DEFAULT = { ctrl: true, meta: false, alt: false, shift: false, code: "BracketLeft", key: "[" };
+  const REC_ATTR = "data-jskin-hk-recording";
+  const store = (typeof browser !== "undefined" && browser.storage && browser.storage.local) || null;
+  let combo = HK_DEFAULT;
+  let recording = false;
+  let customRow = null;
+  if (store) {
+    store.get(HK_KEY).then((r) => {
+      if (r && r[HK_KEY] && r[HK_KEY].code) {
+        combo = r[HK_KEY];
+        renderCustom();
+      }
+    }).catch(() => {});
+    browser.storage.onChanged.addListener((ch, area) => {
+      if (area === "local" && ch[HK_KEY]) {
+        combo = ch[HK_KEY].newValue && ch[HK_KEY].newValue.code ? ch[HK_KEY].newValue : HK_DEFAULT;
+        renderCustom();
+      }
+    });
+  }
+  const comboKeys = (c) => [c.ctrl && "Ctrl", c.meta && "⌘", c.alt && (isMac ? "⌥" : "Alt"), c.shift && "Shift", c.key].filter(Boolean);
+  const sameCombo = (a, b) => a.code === b.code && !!a.ctrl === !!b.ctrl && !!a.meta === !!b.meta && !!a.alt === !!b.alt && !!a.shift === !!b.shift;
+
+  function keyLabel(e) {
+    if (/^Key[A-Z]$/.test(e.code)) return e.code.slice(3);
+    if (/^Digit\d$/.test(e.code)) return e.code.slice(5);
+    const names = { BracketLeft: "[", BracketRight: "]", Backslash: "\\", Semicolon: ";", Quote: "'", Comma: ",", Period: ".",
+      Slash: "/", Backquote: "`", Minus: "-", Equal: "=", Space: "Space", ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→" };
+    return names[e.code] || e.key || e.code;
+  }
+
+  function setRecording(on) {
+    recording = on;
+    if (on) ROOT.setAttribute(REC_ATTR, "1");
+    else ROOT.removeAttribute(REC_ATTR);
+    renderCustom();
+  }
+
+  // returns true if the key event was used for recording
+  function recordKey(e) {
+    if (!recording) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    if (e.key === "Escape") {
+      setRecording(false);
+      return true;
+    }
+    if (["Control", "Meta", "Alt", "Shift", "CapsLock", "Fn"].includes(e.key)) return true; // wait for the real key
+    const fkey = /^F\d{1,2}$/.test(e.code);
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && !fkey) {
+      renderCustom("要带 Ctrl / ⌘ / Alt（或用 F1-F12），不然打字时会误触。");
+      return true;
+    }
+    const c = { ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey, shift: e.shiftKey, code: e.code, key: keyLabel(e) };
+    const clash = [[{ ctrl: true, code: "KeyS" }, "保存"], [{ ctrl: true, code: "KeyZ" }, "撤销"], [{ ctrl: true, shift: true, code: "KeyZ" }, "重做"],
+      [{ ctrl: true, code: "KeyC" }, "复制"], [{ ctrl: true, code: "KeyV" }, "粘贴"], [{ meta: true, code: "KeyS" }, "保存"],
+      [{ meta: true, code: "KeyZ" }, "撤销"], [{ meta: true, code: "KeyC" }, "复制"], [{ meta: true, code: "KeyV" }, "粘贴"]]
+      .find(([x]) => sameCombo(x, c));
+    if (clash) {
+      renderCustom("和 Joget 的「" + clash[1] + "」冲突，换一个。");
+      return true;
+    }
+    combo = c;
+    if (store) store.set({ [HK_KEY]: c }).catch(() => {});
+    setRecording(false);
+    return true;
+  }
+
+  function renderCustom(msg) {
+    if (!customRow) return;
+    customRow.textContent = "";
+    const tdk = el("td", "jskin-hk-keys");
+    if (recording) {
+      tdk.append(el("span", "jskin-hk-rec", "请按新组合键…"));
+    } else {
+      comboKeys(combo).forEach((k, i) => {
+        if (i) tdk.append(document.createTextNode(" + "));
+        tdk.append(el("kbd", "", k));
+      });
+    }
+    const tdl = el("td", "jskin-hk-label");
+    tdl.append(el("span", "", "收起 / 展开左侧面板"));
+    const acts = el("span", "jskin-hk-acts");
+    const edit = el("button", "jskin-hk-edit", recording ? "取消" : "修改");
+    edit.type = "button";
+    edit.id = "jskin-hk-edit-leftpanel";
+    edit.addEventListener("click", (e) => {
+      e.preventDefault();
+      setRecording(!recording);
+    });
+    acts.append(edit);
+    if (!recording && !sameCombo(combo, HK_DEFAULT)) {
+      const reset = el("button", "jskin-hk-edit", "恢复默认");
+      reset.type = "button";
+      reset.addEventListener("click", (e) => {
+        e.preventDefault();
+        combo = HK_DEFAULT;
+        if (store) store.set({ [HK_KEY]: HK_DEFAULT }).catch(() => {});
+        renderCustom();
+      });
+      acts.append(reset);
+    }
+    tdl.append(acts);
+    if (msg || recording) {
+      tdl.append(el("div", "jskin-hk-note", msg || "按 Esc 取消。要带 Ctrl / ⌘ / Alt，或用 F1-F12。"));
+    }
+    customRow.append(tdk, tdl);
+  }
   let busy = false;
   let scheduled = false;
 
@@ -115,6 +232,11 @@
         sec.append(el("div", "jskin-hk-note", g.note));
       }
       const table = el("table", "jskin-hk-table");
+      if (g.custom) {
+        customRow = el("tr", "jskin-hk-custom");
+        table.append(customRow);
+        renderCustom();
+      }
       for (const [keys, label, src] of g.items) {
         const tr = el("tr");
         const tdk = el("td", "jskin-hk-keys");
@@ -147,6 +269,9 @@
   }
 
   function onKey(e) {
+    if (recordKey(e)) {
+      return;
+    }
     if (e.key === "Escape" && panel && panel.isConnected) {
       e.preventDefault();
       e.stopPropagation();
@@ -193,6 +318,9 @@
   }
 
   function closePanel() {
+    if (recording) {
+      setRecording(false);
+    }
     window.removeEventListener("keydown", onKey, true);
     document.removeEventListener("mousedown", onDocClick, true);
     window.removeEventListener("resize", closePanel);

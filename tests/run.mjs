@@ -255,27 +255,98 @@ test("composer: stands down when another copy owns the page", async (page) => {
   return "no button, conflict notice shown";
 });
 
-test("left-panel toggle is at least 20 x 60 px", async (page) => {
+test("left-panel handle: outside the panel, >= 20 x 60 px, opens/closes the panel", async (page) => {
   await open(page, urls.textForm);
   await inject(page);
-  const r = await page.evaluate(() => { const b = document.querySelector("#left-panel-toogle").getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; });
-  assert(r[0] >= 20 && r[1] >= 60, "toggle " + r);
-  return `${r[0]} x ${r[1]} px`;
+  const g = () => page.evaluate(() => {
+    const h = document.getElementById("jskin-left-handle"), lp = document.getElementById("left-panel");
+    const r = h && h.getBoundingClientRect(), p = lp.getBoundingClientRect();
+    return { has: !!h, w: r && Math.round(r.width), hh: r && Math.round(r.height), outside: r && r.left >= p.right - 1,
+      jogetHidden: getComputedStyle(document.getElementById("left-panel-toogle")).opacity === "0",
+      closed: document.body.classList.contains("left-panel-closed") };
+  });
+  const r0 = await g();
+  assert(r0.has && r0.w >= 20 && r0.hh >= 60 && r0.outside && r0.jogetHidden && !r0.closed, "open: " + JSON.stringify(r0));
+  await shot(page, "left-handle-open");
+  await page.click("#jskin-left-handle");
+  await page.waitForTimeout(700);
+  const r1 = await g();
+  await shot(page, "left-handle-closed");
+  await page.click("#jskin-left-handle");
+  await page.waitForTimeout(700);
+  const r2 = await g();
+  assert(r1.closed && r1.outside && !r2.closed, "toggle: " + JSON.stringify({ r1, r2 }));
+  return `${r0.w} x ${r0.hh} px outside the panel; click closes, click again opens`;
 });
 
-test("quick nav: 6px idle, 40px on hover", async (page) => {
+test("left-panel hotkey: Ctrl+[ toggles; can be changed in the hotkeys panel", async (page) => {
   await open(page, urls.textForm);
   await inject(page);
+  const closed = () => page.evaluate(() => document.body.classList.contains("left-panel-closed"));
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
+  await page.keyboard.press("Control+BracketLeft");
+  await page.waitForTimeout(600);
+  const a = await closed();
+  await page.keyboard.press("Control+BracketLeft");
+  await page.waitForTimeout(600);
+  const b = await closed();
+  // change it to Ctrl+Alt+K in the panel
+  await page.click("#jskin-hotkeys-btn");
+  await page.waitForTimeout(300);
+  await page.click("#jskin-hk-edit-leftpanel");
+  await page.keyboard.press("Control+KeyS"); // clash with Save -> refused (Joget never sees it while recording)
+  await page.waitForTimeout(200);
+  const clashMsg = await page.evaluate(() => document.querySelector(".jskin-hk-custom").textContent);
+  await page.keyboard.press("Control+Alt+KeyK");
+  await page.waitForTimeout(300);
+  const row = await page.evaluate(() => document.querySelector(".jskin-hk-custom .jskin-hk-keys").textContent);
+  await shot(page, "hotkey-edited", "#jskin-hotkeys-panel");
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
+  await page.keyboard.press("Control+BracketLeft");
+  await page.waitForTimeout(600);
+  const oldKey = await closed();
+  await page.keyboard.press("Control+Alt+KeyK");
+  await page.waitForTimeout(600);
+  const newKey = await closed();
+  await page.keyboard.press("Control+Alt+KeyK");
+  await page.waitForTimeout(600);
+  await setStore(page, { jogetSkinHotkeyLeftPanel: null });
+  assert(a && !b, "Ctrl+[ did not toggle: " + [a, b]);
+  assert(/冲突/.test(clashMsg), "no clash warning: " + clashMsg);
+  assert(/^Ctrl\+(Alt|⌥)\+K$/.test(row.replace(/\s/g, "")), "row " + row);
+  assert(!oldKey && newKey, "after change: old " + oldKey + " new " + newKey);
+  return "Ctrl+[ toggles; Ctrl+S refused (clash); changed to Ctrl+Alt+K which toggles, old key no longer does";
+});
+
+test("quick nav: 6px idle, handle hover -> 40px, click pins / unpins", async (page) => {
+  await open(page, urls.textForm);
+  await inject(page);
+  await page.evaluate(() => localStorage.removeItem("jogetSkinQuickNavPinned"));
   const w = () => page.evaluate(() => Math.round(document.querySelector("#quick-nav-bar").getBoundingClientRect().width));
   await page.mouse.move(600, 500);
   await page.waitForTimeout(700);
   const idle = await w();
-  await page.hover("#quick-nav-bar", { position: { x: 3, y: 300 } });
+  const hv = await page.evaluate(() => getComputedStyle(document.getElementById("jskin-qn-handle")).display);
+  await page.hover("#jskin-qn-handle");
   await page.waitForTimeout(700);
   const hover = await w();
+  await shot(page, "quicknav-hover");
   await page.mouse.move(600, 500);
-  assert(idle === 6 && hover === 40, `idle ${idle}, hover ${hover}`);
-  return `idle ${idle}px, hover ${hover}px`;
+  await page.waitForTimeout(900);
+  const back = await w();
+  await page.click("#jskin-qn-handle");
+  await page.mouse.move(600, 500);
+  await page.waitForTimeout(900);
+  const pinned = await w();
+  await shot(page, "quicknav-pinned");
+  await page.click("#jskin-qn-handle");
+  await page.mouse.move(600, 500);
+  await page.waitForTimeout(900);
+  const unpinned = await w();
+  assert(hv === "flex" && idle === 6 && hover === 40 && back === 6 && pinned === 40 && unpinned === 6,
+    JSON.stringify({ hv, idle, hover, back, pinned, unpinned }));
+  return `idle ${idle}, hover ${hover}, pinned ${pinned}, unpinned ${unpinned}`;
 });
 
 for (const kind of ["form", "datalist", "userview", "process"]) {
@@ -293,10 +364,10 @@ for (const kind of ["form", "datalist", "userview", "process"]) {
       await page.waitForTimeout(900);
     }
     res.closed = await geo(page);
-    await page.click("#left-panel-toogle");
+    await page.click("#jskin-left-handle");
     await page.waitForTimeout(900);
     res.leftClosed = await geo(page);
-    await page.click("#left-panel-toogle");
+    await page.click("#jskin-left-handle");
     await page.waitForTimeout(900);
     const bad = ["open", "closed", "leftClosed"].filter((k) => !centred(res[k]));
     const fmt = (g) => `L${g.leftGap}/R${g.rightGap} w${g.canvasWidth}${g.panelOpen ? " (props open)" : ""}`;

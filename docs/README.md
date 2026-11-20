@@ -1,4 +1,4 @@
-# Joget Skin v1.3.7 文档索引
+# Joget Skin v1.3.8 文档索引
 
 Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Builder 和 userview 做整理、布局和可选主题。
 每个功能一份文档，写清楚：做什么、文件和行号、存储键、依赖 Joget 的哪些东西（附 Joget 源码出处）、容易坏的地方、坏了怎么查。
@@ -16,7 +16,7 @@ Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Buil
 | `userview.css` + `themes/indigo/userview.css` | userview 页面 | document_start |
 | `composer.js` | `/jw/web/console/app/*/builders*`（只顶层） | document_idle |
 | `chime-sound.js` + `savechime.js` | `/jw/web/console/app/*/builder/*`（只顶层） | document_idle |
-| `hotkeys.js` + `propcollapse.js` | `/jw/web/console/app/*/builder*`（含 `/builders` 和 `/process/builder`） | document_idle |
+| `hotkeys.js` + `propcollapse.js` + `edgetoggles.js` | `/jw/web/console/app/*/builder*`（含 `/builders` 和 `/process/builder`） | document_idle |
 | `popup.html` / `popup.js` | 工具栏弹窗 | — |
 
 所有 CSS 都写在 `html.joget-skin` 之下；`content.js` 拿掉这个 class 就等于整个皮肤关掉。
@@ -29,8 +29,8 @@ Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Buil
 5. [composer.js：App Composer 整理](05-composer.md)
 6. [保存提示音：savechime.js + chime-sound.js](06-save-chime.md)
 7. [弹窗 popup](07-popup.md)
-8. [左栏开关按钮放大](08-left-panel-toggle.md)
-9. [Quick nav 收到右边](09-quick-nav.md)
+8. [左栏开关（面板外侧把手 + 快捷键）](08-left-panel-toggle.md)
+9. [Quick nav 收到右边 + 把手](09-quick-nav.md)
 10. [画布居中](10-canvas-centering.md)
 11. [快捷键按钮](11-hotkeys.md)
 12. [属性面板 全部收起/全部展开](12-property-collapse.md)

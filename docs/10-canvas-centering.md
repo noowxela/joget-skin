@@ -3,7 +3,7 @@
 **做什么**：`#builder_canvas` 在「左栏右边」到「右边被占用的区域」之间水平居中，左右留白一样（各 10px 起），不再贴左。保留 Joget 自己的视口宽度（desktop 1000 / tablet 768 / mobile 375）；放不下时用 `max-width` 缩小（和 Joget 自己的 `max-width` 思路一样）。没有视口 class 的画布（Process Builder 等）直接填满中间空间。预览模式（`#cbuilder.preview`）不动。
 
 **原理**：Joget 的画布是 `position: fixed`，用 `margin-left = 左栏宽 + 5px` 定位。这里改成同时设 `left` 和 `right`，`margin-left/right: auto`，浏览器会自动居中。
-- `--jskin-canvas-gap: 10px` 两边留白
+- `--jskin-canvas-gap: 10px` 两边留白；v1.3.8 有边缘把手时（`html.jskin-edge-handles`）变 30px，给左栏外侧把手和右边 quick nav 把手留位置。quick nav 固定展开时（`html.jskin-qn-pinned`）右边占用 40px
 - `--jskin-canvas-right`：右边被占的宽度
   - quick nav 收起（默认）：6px；没有 quick nav 或在左边：0；Joget 原状 30px
   - 属性面板浮动打开（`max-property-editor`，Joget 的面板 `right: 40px`）：`40px + --builder-right-panel-width`
