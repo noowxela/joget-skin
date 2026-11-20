@@ -27,7 +27,11 @@
 (function () {
   "use strict";
 
-  if (!/\/web\/console\/app\/[^/]+\/[^/]+\/builders\/?$/.test(location.pathname)) {
+  // App Composer only. Joget can switch to a builder page without a full reload
+  // (pushState), so run() re-checks this on every pass and cleans up when we leave.
+  const COMPOSER_RE = /\/web\/console\/app\/[^/]+\/[^/]+\/builders\/?$/;
+  const onComposer = () => COMPOSER_RE.test(location.pathname);
+  if (!onComposer()) {
     return;
   }
   if (window !== window.top || window.__jskinComposerLoaded) {
@@ -479,6 +483,10 @@
     }
     busy = true;
     try {
+      if (!onComposer()) {
+        leaveComposer();
+        return;
+      }
       applyHideClass();
       ensureButton();
       ensureTitleButtons();
@@ -513,6 +521,21 @@
       observer.takeRecords();
       busy = false;
     }
+  }
+
+  // Left App Composer without a reload: drop our button, title buttons and <html> classes
+  // so nothing of the composer layout shows on the builder page. (Called inside run()'s try.)
+  function leaveComposer() {
+    [ACTIVE_CLASS, HIDE_CLASS].forEach((c) => {
+      if (ROOT.classList.contains(c)) {
+        ROOT.classList.remove(c); // only when set: a no-op remove still fires rootObserver
+      }
+    });
+    document.querySelectorAll("#" + BTN_GROUP_ID + ", ." + TITLE_BTNS_CLASS).forEach((el) => {
+      if (mine.has(el)) {
+        el.remove();
+      }
+    });
   }
 
   function schedule() {
@@ -571,6 +594,16 @@
   if (!ROOT.hasAttribute(OWNER_ATTR)) {
     ROOT.setAttribute(OWNER_ATTR, TOKEN);
   }
+
+  // URL changes without a reload (Joget pushState / back-forward)
+  window.addEventListener("popstate", schedule);
+  let lastPath = location.pathname;
+  setInterval(() => {
+    if (location.pathname !== lastPath) {
+      lastPath = location.pathname;
+      schedule();
+    }
+  }, 500);
 
   // search box typing (Joget filters on keyup); re-evaluate collapse
   document.addEventListener("input", (e) => {

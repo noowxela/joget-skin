@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Joget Skin (builder + userview)",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "description": "Declutter tweaks, App Composer layout, optional Indigo theme and a save chime for Joget DX 9 builders and userview pages (toggleable).",
   "browser_specific_settings": {
     "gecko": {
@@ -81,6 +81,17 @@
       "js": [
         "chime-sound.js",
         "savechime.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://*/jw/web/console/app/*/builder*"
+      ],
+      "js": [
+        "hotkeys.js",
+        "propcollapse.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

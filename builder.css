@@ -1,5 +1,5 @@
 /*
- * Joget Skin — builder.css  (v1.3.3)
+ * Joget Skin — builder.css  (v1.3.7)
  * Target: Joget DX 9 (verified on DX Enterprise 9.1.2.2, build ee559cd).
  * Applies to /jw/web/console/*  (App Composer, Form / List / UI / Process Builder, web console).
  * The builder canvas iframe (/jw/builder/blank.jsp) is NOT matched on purpose.
@@ -48,6 +48,8 @@ html.joget-skin #left-panel .components-list ol > li > .builder-palette-element 
  *    App Composer #builders, Process #process-selector.
  *    Do NOT change position/size/transform on #builder_canvas, #element-select-box,
  *    #lf-container (process canvas) or drag sources unless tested with drag/drop.
+ *    (v1.3.7 does move #builder_canvas — see "Focus on #builder_canvas" below; the
+ *    select box alignment is checked by tests/run.mjs "element select box".)
  * ============================================================ */
 
 /* ------------------------------------------------------------
@@ -198,3 +200,324 @@ html.joget-skin #builders .builder-type ul > li.item > .builder-actions a.runpro
 /* Toolbar button group is only shown while the skin is on (composer.js also removes it). */
 html:not(.joget-skin) #jskin-others-group { display: none !important; }
 
+
+/* ============================================================
+ * v1.3.7  Focus on #builder_canvas
+ *   a) #left-panel-toogle: Joget's is 10px x 40px with a 10px icon. Bigger hit area.
+ *      The closed left panel grows from 10px to 22px so the bigger button still fits.
+ *   b) #quick-nav-bar (right side only): tucked into a 6px edge, slides out on hover.
+ *      The 30-40px Joget reserves for it goes back to the canvas.
+ *      Left-positioned nav (quick-nav-position-left) and the opened menu (.active) are untouched.
+ *   c) #builder_canvas centred between the left panel and whatever sits on the right
+ *      (tucked quick nav, or the property editor when it is open).
+ *      Joget's canvas is position:fixed with margin-left = left panel + 5px and a fixed
+ *      viewport width (desktop 1000 / tablet 768 / mobile 375). Here it gets left + right
+ *      edges and margin auto, so the browser centres it and Joget's own width is kept.
+ *      If the width does not fit, max-width shrinks it (same idea as Joget's own max-width).
+ *      Builders without a viewport class (process builder, other views) simply fill the gap.
+ *      Preview mode (#cbuilder.preview) is left to Joget.
+ * ============================================================ */
+html.joget-skin #left-panel-toogle {
+  width: 20px !important;
+  line-height: 64px !important;
+  font-size: 16px !important;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+html.joget-skin #left-panel-toogle i {
+  left: 0 !important;
+}
+html.joget-skin #left-panel-toogle:hover {
+  background-color: #dbe4ff !important;
+  color: #3b5bdb !important;
+  border-color: #91a7ff !important;
+}
+html.joget-skin body.left-panel-closed {
+  --builder-left-panel-width: 22px !important;
+}
+
+html.joget-skin body.quick-nav-shown:not(.quick-nav-position-left) #quick-nav-bar:not(.active) {
+  width: 6px !important;
+  opacity: 0.55;
+  transition: width 0.2s ease-in-out 0.15s, opacity 0.2s ease-in-out 0.15s;
+}
+html.joget-skin body.quick-nav-shown:not(.quick-nav-position-left) #quick-nav-bar:not(.active):hover {
+  width: 40px !important;
+  opacity: 1;
+  transition-delay: 0s;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+}
+/* c) centred canvas.
+ *    --jskin-canvas-right = width taken on the right (tucked quick nav, or the property editor),
+ *    --jskin-canvas-gap   = same free gap on both sides of the canvas. */
+html.joget-skin body#cbuilder {
+  --jskin-canvas-gap: 10px;
+  --jskin-canvas-right: 30px;
+}
+html.joget-skin body#cbuilder:not(.quick-nav-shown),
+html.joget-skin body#cbuilder.quick-nav-position-left {
+  --jskin-canvas-right: 0px;
+}
+html.joget-skin body#cbuilder.quick-nav-shown:not(.quick-nav-position-left) {
+  --jskin-canvas-right: 6px;
+}
+/* property editor open as a floating window (Joget: right 40px, or 0 with left quick nav) */
+html.joget-skin body#cbuilder.max-property-editor.property-editor-right-panel:not(.no-right-panel):not(.right-panel-closed) {
+  --jskin-canvas-right: calc(40px + var(--builder-right-panel-width));
+}
+html.joget-skin body#cbuilder.max-property-editor.quick-nav-position-left.property-editor-right-panel:not(.no-right-panel):not(.right-panel-closed) {
+  --jskin-canvas-right: var(--builder-right-panel-width);
+}
+/* property editor docked (not floating) */
+html.joget-skin body#cbuilder:not(.max-property-editor).property-editor-right-panel:not(.no-right-panel) {
+  --jskin-canvas-right: var(--builder-right-panel-width);
+}
+html.joget-skin body#cbuilder:not(.preview) #builder_canvas {
+  left: calc(var(--builder-left-panel-width) + var(--jskin-canvas-gap)) !important;
+  right: calc(var(--jskin-canvas-right) + var(--jskin-canvas-gap)) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  max-width: calc(100vw - var(--builder-left-panel-width) - var(--jskin-canvas-right) - 2 * var(--jskin-canvas-gap)) !important;
+  transition: width 0.35s ease-in-out, left 0.35s ease-in-out, right 0.35s ease-in-out, max-width 0.35s ease-in-out;
+}
+html.joget-skin body#cbuilder:not(.preview) #builder_canvas:not(.desktop):not(.tablet):not(.mobile) {
+  width: auto !important;
+}
+
+/* ============================================================
+ * v1.3.7  Keyboard shortcut panel (hotkeys.js)
+ * ============================================================ */
+html:not(.joget-skin) #jskin-hotkeys-group,
+html:not(.joget-skin) #jskin-hotkeys-panel {
+  display: none !important;
+}
+html.joget-skin #jskin-hotkeys-btn i {
+  font-size: 18px;
+}
+html.joget-skin #jskin-hotkeys-panel {
+  position: fixed;
+  z-index: 2000010;
+  width: 440px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #212529;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e9ecef;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-close {
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 4px;
+  color: #6c757d;
+  cursor: pointer;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-close:hover {
+  color: #212529;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-body {
+  overflow-y: auto;
+  padding: 4px 12px 10px;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-gtitle {
+  margin: 10px 0 4px;
+  font-weight: 600;
+  color: #3b5bdb;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-note,
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-foot {
+  font-size: 11px;
+  color: #6c757d;
+  margin-bottom: 4px;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-foot {
+  margin-top: 10px;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-table td {
+  padding: 3px 0;
+  vertical-align: top;
+  border-bottom: 1px dashed #f1f3f5;
+}
+html.joget-skin #jskin-hotkeys-panel .jskin-hk-keys {
+  width: 150px;
+  white-space: nowrap;
+  color: #868e96;
+}
+html.joget-skin #jskin-hotkeys-panel kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: center;
+  color: #212529;
+  background: #f8f9fa;
+  border: 1px solid #ced4da;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+/* ============================================================
+ * v1.3.7  Property editor: 全部收起 / 全部展开 bar (propcollapse.js)
+ * ============================================================ */
+html:not(.joget-skin) .jskin-prop-collapse-bar {
+  display: none !important;
+}
+/* Joget's .property-editor-pages is absolutely positioned at top 0 of its container,
+ * so the bar sits in that spot and the pages move down by the bar's height. */
+html.joget-skin .jskin-prop-collapse-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 8px;
+}
+html.joget-skin .jskin-prop-collapse-bar + .property-editor-pages {
+  top: 30px !important;
+  height: calc(100% - 30px) !important;
+}
+html.joget-skin .jskin-prop-collapse-bar .jskin-prop-collapse-btn {
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 2px 10px;
+}
+
+/* ============================================================
+ * v1.3.7  Property editor rows: label on the left, input on the right
+ *   Joget stacks label and input (narrow panel) or uses 20% / 80% floats.
+ *   Only simple one-line inputs go side by side; everything wide or complex
+ *   (header, grid*, elementselect, elementmultiselect, codeeditor, textarea,
+ *   htmleditor, repeater, multi-option checkbox, radio, imageradio, multiselect,
+ *   sortableselect, iconbuttons, cssstyle, colorscheme, file, image, label, custom)
+ *   keeps Joget's stacked layout.
+ *   .property-label-container gets display:contents so the label and its
+ *   description become grid cells; the description goes under the input.
+ *   Rows Joget hides (class hidden or inline display:none) stay hidden.
+ * ============================================================ */
+html.joget-skin #right-panel .property-editor-property:is(
+    .property-type-textfield,
+    .property-type-icon-textfield,
+    .property-type-autocomplete,
+    .property-type-selectbox,
+    .property-type-number,
+    .property-type-password,
+    .property-type-color,
+    .property-type-readonly,
+    .property-type-checkbox-truefalse
+  ):not(.hidden):not([style*="display: none"]):not([style*="display:none"]) {
+  display: grid !important;
+  grid-template-columns: minmax(110px, 38%) minmax(0, 1fr);
+  grid-template-areas: "jlabel jinput" ". jdesc";
+  column-gap: 10px;
+  align-items: center;
+}
+html.joget-skin #right-panel .property-editor-property:is(
+    .property-type-textfield,
+    .property-type-icon-textfield,
+    .property-type-autocomplete,
+    .property-type-selectbox,
+    .property-type-number,
+    .property-type-password,
+    .property-type-color,
+    .property-type-readonly,
+    .property-type-checkbox-truefalse
+  ) > .property-label-container {
+  display: contents;
+}
+html.joget-skin #right-panel .property-editor-property:is(
+    .property-type-textfield,
+    .property-type-icon-textfield,
+    .property-type-autocomplete,
+    .property-type-selectbox,
+    .property-type-number,
+    .property-type-password,
+    .property-type-color,
+    .property-type-readonly,
+    .property-type-checkbox-truefalse
+  ) > .property-label-container > .property-label {
+  grid-area: jlabel;
+  padding: 0 !important;
+  margin: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+html.joget-skin #right-panel .property-editor-property:is(
+    .property-type-textfield,
+    .property-type-icon-textfield,
+    .property-type-autocomplete,
+    .property-type-selectbox,
+    .property-type-number,
+    .property-type-password,
+    .property-type-color,
+    .property-type-readonly,
+    .property-type-checkbox-truefalse
+  ) > .property-label-container > .property-description {
+  grid-area: jdesc;
+  margin-top: 2px;
+}
+html.joget-skin #right-panel .property-editor-property:is(
+    .property-type-textfield,
+    .property-type-icon-textfield,
+    .property-type-autocomplete,
+    .property-type-selectbox,
+    .property-type-number,
+    .property-type-password,
+    .property-type-color,
+    .property-type-readonly,
+    .property-type-checkbox-truefalse
+  ) > .property-input {
+  grid-area: jinput;
+  width: auto !important;
+  min-width: 0;
+  float: none !important;
+}
+html.joget-skin #right-panel .property-editor-property:is(
+    .property-type-textfield,
+    .property-type-icon-textfield,
+    .property-type-autocomplete,
+    .property-type-selectbox,
+    .property-type-number,
+    .property-type-password,
+    .property-type-color,
+    .property-type-readonly,
+    .property-type-checkbox-truefalse
+  ) > div[style*="clear"] {
+  display: none;
+}
+/* (property editor in non single-page mode: pages are in normal flow, so the bar is too) */
+html.joget-skin .property-editor-container:not(.single-page) > .jskin-prop-collapse-bar {
+  position: static;
+}
+html.joget-skin .property-editor-container:not(.single-page) > .jskin-prop-collapse-bar + .property-editor-pages {
+  top: auto !important;
+  height: auto !important;
+}
