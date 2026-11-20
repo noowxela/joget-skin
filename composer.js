@@ -31,9 +31,9 @@
   // (pushState), so run() re-checks this on every pass and cleans up when we leave.
   const COMPOSER_RE = /\/web\/console\/app\/[^/]+\/[^/]+\/builders\/?$/;
   const onComposer = () => COMPOSER_RE.test(location.pathname);
-  if (!onComposer()) {
-    return;
-  }
+  // v1.3.9: also injected on builder pages (manifest "builder*"), because Joget can go
+  // builder -> App Composer without a reload; then this copy adds the button on arrival.
+  // On a builder page run() only calls leaveComposer(), so nothing shows there.
   if (window !== window.top || window.__jskinComposerLoaded) {
     return; // top frame, one instance per extension
   }

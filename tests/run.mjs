@@ -212,6 +212,25 @@ test("composer: show-others button only on /builders, hides extra builders", asy
   return `button after Advanced Tools; 4 types -> ${n2} after click`;
 });
 
+test("composer: show-others never on form/list/UI/process builder pages", async (page) => {
+  const seen = [];
+  const u = await builderUrls(page);
+  for (const k of ["form", "datalist", "userview", "process"]) {
+    if (!u[k]) continue;
+    await open(page, u[k]);
+    await inject(page);
+    await page.waitForTimeout(600);
+    const r = await page.evaluate(() => ({
+      btn: !!document.getElementById("jskin-others-group"),
+      cls: document.documentElement.classList.contains("jskin-composer") || document.documentElement.classList.contains("jskin-composer-hide-others"),
+      alive: !!window.__jskinComposerLoaded,
+    }));
+    assert(!r.btn && !r.cls, k + ": " + JSON.stringify(r));
+    seen.push(`${k}${r.alive ? "" : "(script not loaded)"}`);
+  }
+  return "no button on " + seen.join(", ");
+});
+
 test("composer: removes its button/classes after SPA navigation to a builder", async (page) => {
   await open(page, URLS.composer, "#builders");
   await inject(page);
@@ -319,34 +338,33 @@ test("left-panel hotkey: Ctrl+[ toggles; can be changed in the hotkeys panel", a
   return "Ctrl+[ toggles; Ctrl+S refused (clash); changed to Ctrl+Alt+K which toggles, old key no longer does";
 });
 
-test("quick nav: 6px idle, handle hover -> 40px, click pins / unpins", async (page) => {
+test("quick nav: hidden, no hover reveal, toggle button opens / closes", async (page) => {
   await open(page, urls.textForm);
   await inject(page);
-  await page.evaluate(() => localStorage.removeItem("jogetSkinQuickNavPinned"));
+  await page.evaluate(() => { localStorage.removeItem("jogetSkinQuickNavPinned"); document.documentElement.classList.remove("jskin-qn-pinned"); });
+  await page.waitForTimeout(500);
   const w = () => page.evaluate(() => Math.round(document.querySelector("#quick-nav-bar").getBoundingClientRect().width));
+  const hs = () => page.evaluate(() => { const r = document.getElementById("jskin-qn-handle").getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), Math.round(document.documentElement.clientWidth - r.right)]; });
   await page.mouse.move(600, 500);
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(500);
   const idle = await w();
-  const hv = await page.evaluate(() => getComputedStyle(document.getElementById("jskin-qn-handle")).display);
+  const h0 = await hs();
   await page.hover("#jskin-qn-handle");
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(600);
   const hover = await w();
-  await shot(page, "quicknav-hover");
-  await page.mouse.move(600, 500);
-  await page.waitForTimeout(900);
-  const back = await w();
   await page.click("#jskin-qn-handle");
   await page.mouse.move(600, 500);
-  await page.waitForTimeout(900);
-  const pinned = await w();
-  await shot(page, "quicknav-pinned");
+  await page.waitForTimeout(600);
+  const opened = await w();
+  const h1 = await hs();
+  await shot(page, "quicknav-open");
   await page.click("#jskin-qn-handle");
   await page.mouse.move(600, 500);
-  await page.waitForTimeout(900);
-  const unpinned = await w();
-  assert(hv === "flex" && idle === 6 && hover === 40 && back === 6 && pinned === 40 && unpinned === 6,
-    JSON.stringify({ hv, idle, hover, back, pinned, unpinned }));
-  return `idle ${idle}, hover ${hover}, pinned ${pinned}, unpinned ${unpinned}`;
+  await page.waitForTimeout(600);
+  const closed = await w();
+  assert(idle === 0 && hover === 0 && opened === 40 && closed === 0, JSON.stringify({ idle, hover, opened, closed }));
+  assert(h0[0] === 20 && h0[1] === 64 && h0[2] === 0 && h1[2] === 40, "button " + JSON.stringify({ h0, h1 }));
+  return `hidden ${idle}px, hover ${hover}px, click ${opened}px, click again ${closed}px; button 20x64 at edge, rides to 40px`;
 });
 
 for (const kind of ["form", "datalist", "userview", "process"]) {
@@ -596,7 +614,7 @@ test("skin off: everything from v1.3.7 goes away", async (page) => {
   const after = await geo(page);
   assert(!r.hk && !r.bar && !r.grid, "leftovers: " + JSON.stringify(r));
   assert(after.canvasLeft === before.canvasLeft && after.canvasWidth === before.canvasWidth, `canvas not restored ${JSON.stringify(before)} vs ${JSON.stringify(after)}`);
-  assert(r.qn !== 6 && r.tog < 20, "quick nav / toggle still skinned " + JSON.stringify(r));
+  assert(r.qn >= 30 && r.tog < 20, "quick nav / toggle still skinned " + JSON.stringify(r));
   return `no button/bar/grid rows; canvas back to left ${after.canvasLeft} w${after.canvasWidth}; quick nav ${r.qn}px; toggle ${r.tog}px`;
 });
 

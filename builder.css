@@ -205,8 +205,9 @@ html:not(.joget-skin) #jskin-others-group { display: none !important; }
  * v1.3.7  Focus on #builder_canvas
  *   a) #left-panel-toogle: Joget's is 10px x 40px with a 10px icon. Bigger hit area.
  *      The closed left panel grows from 10px to 22px so the bigger button still fits.
- *   b) #quick-nav-bar (right side only): tucked into a 6px edge, slides out on hover.
- *      The 30-40px Joget reserves for it goes back to the canvas.
+ *   b) #quick-nav-bar (right side only): fully hidden; v1.3.8+ it opens/closes only with the
+ *      edge toggle button (edgetoggles.js, html.jskin-qn-pinned). No hover reveal.
+ *      The 30-40px Joget reserves for it goes back to the canvas while it is closed.
  *      Left-positioned nav (quick-nav-position-left) and the opened menu (.active) are untouched.
  *   c) #builder_canvas centred between the left panel and whatever sits on the right
  *      (tucked quick nav, or the property editor when it is open).
@@ -234,15 +235,12 @@ html.joget-skin #left-panel-toogle:hover {
 }
 
 html.joget-skin body.quick-nav-shown:not(.quick-nav-position-left) #quick-nav-bar:not(.active) {
-  width: 6px !important;
-  opacity: 0.55;
-  transition: width 0.2s ease-in-out 0.15s, opacity 0.2s ease-in-out 0.15s;
-}
-html.joget-skin body.quick-nav-shown:not(.quick-nav-position-left) #quick-nav-bar:not(.active):hover {
-  width: 40px !important;
-  opacity: 1;
-  transition-delay: 0s;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+  width: 0 !important;
+  border-width: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  visibility: hidden;
+  transition: width 0.25s ease-in-out, visibility 0s linear 0.25s;
 }
 /* c) centred canvas.
  *    --jskin-canvas-right = width taken on the right (tucked quick nav, or the property editor),
@@ -255,15 +253,15 @@ html.joget-skin body#cbuilder {
 html.joget-skin.jskin-edge-handles body#cbuilder {
   --jskin-canvas-gap: 30px;
 }
-html.joget-skin.jskin-qn-pinned body#cbuilder.quick-nav-shown:not(.quick-nav-position-left) {
-  --jskin-canvas-right: 40px;
-}
 html.joget-skin body#cbuilder:not(.quick-nav-shown),
 html.joget-skin body#cbuilder.quick-nav-position-left {
   --jskin-canvas-right: 0px;
 }
 html.joget-skin body#cbuilder.quick-nav-shown:not(.quick-nav-position-left) {
-  --jskin-canvas-right: 6px;
+  --jskin-canvas-right: 0px;
+}
+html.joget-skin.jskin-qn-pinned body#cbuilder.quick-nav-shown:not(.quick-nav-position-left) {
+  --jskin-canvas-right: 40px;
 }
 /* property editor open as a floating window (Joget: right 40px, or 0 with left quick nav) */
 html.joget-skin body#cbuilder.max-property-editor.property-editor-right-panel:not(.no-right-panel):not(.right-panel-closed) {
@@ -318,8 +316,8 @@ html.joget-skin #jskin-hotkeys-panel .jskin-hk-rec {
  *   a) #jskin-left-handle: our button just OUTSIDE the left panel's right edge
  *      (#left-panel is overflow:hidden, so Joget's own toggle can't sit outside).
  *      Clicking it clicks Joget's #left-panel-toogle, which is made transparent while ours exists.
- *   b) #jskin-qn-handle: a tab on the right edge; hover slides the tucked quick nav out,
- *      click pins it open (html.jskin-qn-pinned).
+ *   b) #jskin-qn-handle: same 20 x 64 toggle on the right edge; click opens / closes the
+ *      hidden quick nav (html.jskin-qn-pinned) and the button rides along its left edge.
  * ============================================================ */
 html:not(.joget-skin) #jskin-left-handle,
 html:not(.joget-skin) #jskin-qn-handle,
@@ -336,6 +334,7 @@ html.joget-skin #jskin-left-handle,
 html.joget-skin #jskin-qn-handle {
   position: fixed;
   z-index: 2001;
+  margin: 0;
   padding: 0;
   border: 1px solid #c5ccd6;
   background: #f1f3f5;
@@ -367,14 +366,14 @@ html.joget-skin #jskin-left-handle {
 }
 html.joget-skin #jskin-qn-handle {
   display: none;
-  right: 6px;
+  right: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 16px;
+  width: 20px;
   height: 64px;
   border-right: 0;
   border-radius: 8px 0 0 8px;
-  transition: right 0.2s ease-in-out 0.15s, background-color 0.15s, color 0.15s;
+  transition: right 0.25s ease-in-out, background-color 0.15s, color 0.15s;
 }
 html.joget-skin body.quick-nav-shown:not(.quick-nav-position-left) #jskin-qn-handle {
   display: flex;
@@ -382,23 +381,17 @@ html.joget-skin body.quick-nav-shown:not(.quick-nav-position-left) #jskin-qn-han
 html.joget-skin body:has(#quick-nav-bar.active) #jskin-qn-handle {
   display: none;
 }
-/* hovering the handle (or the nav itself), or pinned: nav out, handle rides along */
-html.joget-skin body.quick-nav-shown:not(.quick-nav-position-left):has(#jskin-qn-handle:hover) #quick-nav-bar:not(.active),
+/* open (button clicked): nav out, button rides along its left edge */
 html.joget-skin.jskin-qn-pinned body.quick-nav-shown:not(.quick-nav-position-left) #quick-nav-bar:not(.active) {
   width: 40px !important;
-  opacity: 1;
-  transition-delay: 0s;
+  border-width: revert-layer !important;
+  overflow: visible;
+  visibility: visible;
+  transition: width 0.25s ease-in-out, visibility 0s;
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
 }
-html.joget-skin body:has(#quick-nav-bar:hover) #jskin-qn-handle,
-html.joget-skin body:has(#jskin-qn-handle:hover) #jskin-qn-handle,
 html.joget-skin.jskin-qn-pinned #jskin-qn-handle {
   right: 40px;
-  transition-delay: 0s, 0s, 0s;
-}
-html.joget-skin.jskin-qn-pinned #jskin-qn-handle {
-  background: #dbe4ff;
-  color: #3b5bdb;
 }
 
 /* ============================================================

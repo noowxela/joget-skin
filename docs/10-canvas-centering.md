@@ -5,7 +5,7 @@
 **原理**：Joget 的画布是 `position: fixed`，用 `margin-left = 左栏宽 + 5px` 定位。这里改成同时设 `left` 和 `right`，`margin-left/right: auto`，浏览器会自动居中。
 - `--jskin-canvas-gap: 10px` 两边留白；v1.3.8 有边缘把手时（`html.jskin-edge-handles`）变 30px，给左栏外侧把手和右边 quick nav 把手留位置。quick nav 固定展开时（`html.jskin-qn-pinned`）右边占用 40px
 - `--jskin-canvas-right`：右边被占的宽度
-  - quick nav 收起（默认）：6px；没有 quick nav 或在左边：0；Joget 原状 30px
+  - quick nav 收起（默认，完全隐藏）：0；展开：40px；没有 quick nav 或在左边：0；Joget 原状 30px
   - 属性面板浮动打开（`max-property-editor`，Joget 的面板 `right: 40px`）：`40px + --builder-right-panel-width`
   - 属性面板停靠：`--builder-right-panel-width`
 

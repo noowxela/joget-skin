@@ -1,4 +1,4 @@
-# Joget Skin v1.3.8 文档索引
+# Joget Skin v1.3.9 文档索引
 
 Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Builder 和 userview 做整理、布局和可选主题。
 每个功能一份文档，写清楚：做什么、文件和行号、存储键、依赖 Joget 的哪些东西（附 Joget 源码出处）、容易坏的地方、坏了怎么查。

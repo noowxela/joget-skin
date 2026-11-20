@@ -32,3 +32,5 @@
 - 按钮不见：`document.querySelector("#builderToolbar .advanced-tools-toogle")` 是否存在；`<html>` 是否有 `jskin-composer`。
 - 分组不见：`document.querySelector("#builders > .builder-type.builder-form .ul-wrapper > ul")`。
 - 测试：`composer: …` 四个测试（按钮/隐藏、单页跳转、分组+重载后保持收起、让位）。
+
+**v1.3.9**：`composer.js` 也注入到 `app/*/builder*` 页面（manifest），因为从 Builder 切回 App Composer 时 Joget 不整页刷新；在 Builder 页面上 `run()` 只做 `leaveComposer()`，按钮不会出现。测试：`composer: show-others never on form/list/UI/process builder pages`。

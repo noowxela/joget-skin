@@ -9,9 +9,9 @@
  *    flips body.left-panel-closed and the arrow icon. Joget's button is made transparent
  *    (not display:none: Joget ignores clicks on a button jQuery sees as hidden) while ours
  *    exists (html.jskin-edge-handles).
- * 2. Quick nav (right side): a visible tab (#jskin-qn-handle) on the right edge.
- *    Hovering it slides the tucked #quick-nav-bar out (CSS :has); clicking it pins the
- *    nav open / unpins it (html.jskin-qn-pinned, remembered in localStorage).
+ * 2. Quick nav (right side): #quick-nav-bar is fully hidden; a 20 x 64 toggle button
+ *    (#jskin-qn-handle, same look as the left one) on the right edge opens / closes it
+ *    (html.jskin-qn-pinned, remembered in localStorage). No hover reveal.
  *
  * 3. A hotkey (default Ctrl+[) toggles the left panel (same as clicking the handle).
  *    Also caught inside the builder canvas iframe. Skipped inside CodeMirror (Ctrl+[ is
@@ -146,9 +146,9 @@
       });
       document.body.append(h);
     }
-    h.title = pinned ? "取消固定 Quick Nav" : "Quick Nav（悬停展开，点击固定）";
+    h.title = pinned ? "收起 Quick Nav" : "展开 Quick Nav";
     const i = h.firstElementChild;
-    const want = "las " + (pinned ? "la-angle-right" : "la-angle-left");
+    const want = "las " + (pinned ? "la-angle-right" : "la-angle-left"); // arrow points where it will go
     if (i.className !== want) i.className = want;
   }
 
