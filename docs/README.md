@@ -1,4 +1,4 @@
-# Joget Skin v1.4.0 文档索引
+# Joget Skin v1.4.1 文档索引
 
 Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Builder 和 userview 做整理、布局和可选主题。
 每个功能一份文档，写清楚：做什么、文件和行号、存储键、依赖 Joget 的哪些东西（附 Joget 源码出处）、容易坏的地方、坏了怎么查。
@@ -37,6 +37,7 @@ Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Buil
 12. [属性面板 全部收起/全部展开](12-property-collapse.md)
 13. [属性面板 标签左、输入框右](13-property-rows.md)
 14. [单流程复制（导出 / 导入）](14-process-copy.md)
+15. [Firefox 自托管自动更新](15-auto-update.md)
 
 ## 通用排查步骤
 1. DevTools → Elements：`<html>` 上有没有 `joget-skin`。没有 → 看 [01](01-content-js.md)。

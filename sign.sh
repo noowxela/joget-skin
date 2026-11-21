@@ -25,4 +25,6 @@ npx --yes web-ext sign \
   --api-key="$AMO_JWT_ISSUER" \
   --api-secret="$AMO_JWT_SECRET" \
   --ignore-files "screenshots/**" "themes/v1.1-indigo/**" "*.zip" "node_modules/**" \
-                 "sign.sh" "package.json" "package-lock.json" ".env" ".env.example" ".gitignore"
+                 "sign.sh" "release.sh" "scripts/**" "docs/**" "tests/**" "README.md" \
+                 "package.json" "package-lock.json" ".env" ".env.example" ".gitignore" \
+                 "AGENTS.md" ".amo-upload-uuid"
