@@ -14,6 +14,7 @@
  * browser.storage). It never clicks Save and never submits anything.
  */
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 
@@ -64,7 +65,9 @@ const STUB = `(() => {
     },
   };
   window.browser = { __jskinStub: true, storage: { local, onChanged: { addListener: (fn) => listeners.push(fn) } },
-    runtime: { getManifest: () => (${JSON.stringify({ version: manifest.version })}) } };
+    runtime: { getManifest: () => (${JSON.stringify({ version: manifest.version })}),
+      // web_accessible_resources (pcopy-page.js) are served from the extension dir by ctx.route below
+      getURL: (p) => location.origin + "/__jskin_ext/" + p } };
 })();`;
 
 /* content scripts per URL, taken from manifest.json (same order as Firefox) */
@@ -658,9 +661,180 @@ test("skin off: everything from v1.3.7 goes away", async (page) => {
   return `no button/bar/grid rows; canvas back to left ${after.canvasLeft} w${after.canvasWidth}; quick nav ${r.qn}px; toggle ${r.tog}px`;
 });
 
+/* ---------- v1.4.0 process copy ---------- */
+const pbData = (page) => page.evaluate(() => {
+  const D = CustomBuilder.data, P = ProcessBuilder;
+  return JSON.parse(JSON.stringify({
+    procs: P.getArray(D.xpdl.Package.WorkflowProcesses, "WorkflowProcess"),
+    parts: P.getArray(D.xpdl.Package.Participants, "Participant"),
+    participants: D.participants || {}, activityForms: D.activityForms || {}, activityPlugins: D.activityPlugins || {},
+    current: P.currentProcessData.properties.id,
+  }));
+});
+const stripKeys = (o, pid) => Object.fromEntries(Object.entries(o).filter(([k]) => k.startsWith(pid + "::")).map(([k, v]) => [k.slice(pid.length + 2), v]));
+const pick = (o, pid) => Object.fromEntries(Object.entries(o).filter(([k]) => k.startsWith(pid + "::")));
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const noLayout = (o) => JSON.parse(JSON.stringify(o), (k, v) => (k === "-Value" && typeof v === "string"
+  ? v.replace(/(X_OFFSET|Y_OFFSET)=[^,]*/g, "$1=").replace(/NO_ROUTING_\w+/g, "NO_ROUTING").replace(/^-?[\d.]+,-?[\d.]+$/, "x,y") : v));
+async function openProcessBuilder(page) {
+  await open(page, urls.process);
+  await page.waitForFunction(() => window.ProcessBuilder && ProcessBuilder.currentProcessData && ProcessBuilder.currentProcessData.properties, null, { timeout: 20000 });
+  await inject(page);
+  await page.waitForSelector("#jskin-pcopy-group", { timeout: 5000 });
+}
+async function exportBundle(page) {
+  const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.click("#jskin-pcopy-export")]);
+  const file = path.join(os.tmpdir(), "jskin-" + Date.now() + "-" + dl.suggestedFilename());
+  await dl.saveAs(file);
+  return { file, name: dl.suggestedFilename(), bundle: JSON.parse(fs.readFileSync(file, "utf8")) };
+}
+async function chooseImport(page, file) {
+  const [fc] = await Promise.all([page.waitForEvent("filechooser", { timeout: 10000 }), page.click("#jskin-pcopy-import")]);
+  await fc.setFiles(file);
+  await page.waitForSelector("#jskin-pcopy-dialog", { timeout: 15000 });
+}
+const writeTmp = (name, obj) => { const f = path.join(os.tmpdir(), "jskin-" + Date.now() + "-" + name); fs.writeFileSync(f, typeof obj === "string" ? obj : JSON.stringify(obj)); return f; };
+
+test("process copy: export button only on process builder, bundle re-keyed, secrets blanked", async (page) => {
+  await openProcessBuilder(page);
+  const order = await page.evaluate(() => { const a = document.querySelector("#builderToolbar .advanced-tools-toogle"); return [a.nextElementSibling?.id, a.nextElementSibling?.nextElementSibling?.id]; });
+  assert(order[0] === "jskin-hotkeys-group" && order[1] === "jskin-pcopy-group", "order " + order);
+  // put dummy credentials into the in-memory data (never saved) to check they are blanked
+  await page.evaluate(() => {
+    const pid = ProcessBuilder.currentProcessData.properties.id;
+    const k = Object.keys(CustomBuilder.data.activityPlugins).find((x) => x.startsWith(pid + "::"));
+    const pr = CustomBuilder.data.activityPlugins[k].properties = CustomBuilder.data.activityPlugins[k].properties || {};
+    pr.username = "dummy-user"; pr.password = "dummy-pass"; pr.apiKey = "#envVariable.keep#";
+  });
+  const before = await pbData(page);
+  await shot(page, "pcopy-toolbar", "#builderToolbar");
+  const { name, bundle: b } = await exportBundle(page);
+  const pid = before.current;
+  assert(b.kind === "joget-process-bundle" && b.v === 1 && b.source.processId === pid && b.process["-Id"] === pid, "header " + JSON.stringify(b.source));
+  assert(name.endsWith(pid + ".process.json"), "file " + name);
+  assert(same(b.activityForms, stripKeys(before.activityForms, pid)), "activityForms differ");
+  assert(same(b.participantMap, stripKeys(before.participants, pid)), "participantMap differ");
+  const plug = stripKeys(before.activityPlugins, pid);
+  const tk = await page.evaluate(() => { const pid = ProcessBuilder.currentProcessData.properties.id; return Object.keys(CustomBuilder.data.activityPlugins).find((x) => x.startsWith(pid + "::")).split("::")[1]; });
+  const mine = ["username", "password"].map((f) => `activityPlugins.${tk}.properties.${f}`);
+  assert(mine.every((x) => b.sensitive.includes(x)) && !b.sensitive.some((x) => x.endsWith(".apiKey")), "sensitive " + JSON.stringify(b.sensitive));
+  assert(b.activityPlugins[tk].properties.password === "" && b.activityPlugins[tk].properties.username === "" && b.activityPlugins[tk].properties.apiKey === "#envVariable.keep#", "not blanked");
+  assert(Object.keys(b.activityPlugins).length === Object.keys(plug).length, "plugin count");
+  assert(b.participants.length > 0 && b.requires.forms.length > 0 && b.requires.plugins.length > 0, "requires " + JSON.stringify(b.requires));
+  const after = await pbData(page);
+  assert(same(before, after), "export changed the designer data");
+  // not on other builders
+  await open(page, urls.textForm);
+  await inject(page);
+  const onForm = await page.evaluate(() => !!document.getElementById("jskin-pcopy-group"));
+  assert(!onForm, "pcopy buttons on the form builder");
+  return `${name}: ${b.participants.length} participants, forms ${Object.keys(b.activityForms).length}, plugins ${Object.keys(b.activityPlugins).length}; requires ${b.requires.forms.length} forms / ${b.requires.plugins.length} plugins; blanked ${b.sensitive.join(", ")}`;
+});
+
+test("process copy: import into the same app -> _2 id like Clone, mappings re-keyed, others unchanged, not saved", async (page, ctx) => {
+  await openProcessBuilder(page);
+  const { file, bundle } = await exportBundle(page);
+  const before = await pbData(page);
+  const pid = before.current;
+  await chooseImport(page, file);
+  const txt = await page.textContent("#jskin-pcopy-dialog");
+  assert(txt.includes(pid + "_2"), "dialog has no new id: " + txt.slice(0, 300));
+  await page.click("#jskin-pcopy-dialog .btn-primary");
+  const nid = pid + "_2";
+  await page.waitForFunction((n) => location.hash === "#" + n && ProcessBuilder.currentProcessData && ProcessBuilder.currentProcessData.properties.id === n, nid, { timeout: 15000 });
+  await page.waitForTimeout(1500);
+  const after = await pbData(page);
+  const opts = await page.evaluate(() => [...document.querySelectorAll("#processes_list option")].map((o) => o.value));
+  const saved = await page.evaluate(() => CustomBuilder.isSaved());
+  await page.click("#processes_list_chosen a.chosen-single").catch(() => {});
+  await page.waitForTimeout(400);
+  await shot(page, "pcopy-imported-dropdown");
+  assert(opts.includes(nid) && opts.includes(pid), "dropdown " + opts);
+  assert(same(stripKeys(after.activityForms, nid), stripKeys(before.activityForms, pid)), "activityForms not re-keyed 1:1");
+  // plugins: same keys; values = the exported ones (sensitive fields blanked on export)
+  assert(same(Object.keys(stripKeys(after.activityPlugins, nid)).sort(), Object.keys(stripKeys(before.activityPlugins, pid)).sort()), "activityPlugins keys");
+  assert(same(stripKeys(after.activityPlugins, nid), bundle.activityPlugins), "activityPlugins values != bundle");
+  // participants: re-keyed with the renamed participant ids (like cloneProcess)
+  const newParts = after.parts.filter((p) => !before.parts.some((q) => q["-Id"] === p["-Id"])).map((p) => p["-Id"]);
+  assert(newParts.length > 0 && newParts.every((x) => x.startsWith(nid + "_")), "new participants " + newParts);
+  const pm = stripKeys(after.participants, nid);
+  assert(pm.processStartWhiteList && newParts.every((x) => x in pm || !(x.slice(nid.length + 1) in stripKeys(before.participants, pid))), "participant map " + JSON.stringify(Object.keys(pm)));
+  // original processes / mappings untouched
+  // Joget re-serializes the layout of the open process on triggerChange (offsets, transition style);
+  // its own Clone does exactly the same, so compare without layout values here and against Clone below
+  assert(same(noLayout(after.procs.filter((p) => p["-Id"] !== nid)), noLayout(before.procs)), "existing processes changed");
+  for (const m of ["participants", "activityForms", "activityPlugins"]) {
+    const o = (x) => Object.fromEntries(Object.entries(x[m]).filter(([k]) => !k.startsWith(nid + "::")));
+    assert(same(o(after), o(before)), m + ": existing entries changed");
+  }
+  const np = after.procs.find((p) => p["-Id"] === nid);
+  assert(saved === false, "should be unsaved (no auto-save)");
+  // same result as Joget's own Clone button (ProcessBuilder.cloneProcess) in a fresh page
+  const p2 = await ctx.newPage();
+  await open(p2, urls.process);
+  await p2.waitForFunction(() => window.ProcessBuilder && ProcessBuilder.currentProcessData && ProcessBuilder.currentProcessData.properties, null, { timeout: 20000 });
+  await p2.evaluate(() => ProcessBuilder.cloneProcess());
+  await p2.waitForTimeout(2000);
+  const nat = await pbData(p2);
+  await p2.close();
+  assert(same(nat.procs.find((p) => p["-Id"] === pid), after.procs.find((p) => p["-Id"] === pid)), "original process differs from what Clone leaves");
+  assert(same(noLayout(nat.procs.find((p) => p["-Id"] === nid)), noLayout(np)), "new process differs from Clone's copy");
+  assert(same(nat.parts.map((p) => p["-Id"]).sort(), after.parts.map((p) => p["-Id"]).sort()), "participants differ from Clone");
+  for (const m of ["participants", "activityForms", "activityPlugins"]) {
+    assert(same(Object.keys(pick(nat[m], nid)).sort(), Object.keys(pick(after[m], nid)).sort()), m + " keys differ from Clone");
+  }
+  assert(same(pick(nat.activityForms, nid), pick(after.activityForms, nid)) && same(pick(nat.participants, nid), pick(after.participants, nid)), "form / participant mappings differ from Clone");
+  return `same as Joget Clone; new ${nid} "${np["-Name"]}"; participants ${newParts.join(", ")}; forms ${Object.keys(stripKeys(after.activityForms, nid)).length} / plugins ${Object.keys(stripKeys(after.activityPlugins, nid)).length} re-keyed; existing unchanged; unsaved`;
+});
+
+test("process copy: warnings dialog (missing form/plugin, renames, re-enter fields), cancel and bad file change nothing", async (page) => {
+  await openProcessBuilder(page);
+  const { bundle: b } = await exportBundle(page);
+  const before = await pbData(page);
+  const pid = before.current;
+  // simulate a bundle from another app: new process id, a form and a plugin this app does not have
+  b.process["-Id"] = "jskin_remote_proc";
+  b.source.appId = "remote_app";
+  const act = Object.keys(b.activityForms).find((k) => k !== "runProcess") || "runProcess";
+  b.activityForms[act] = Object.assign({}, b.activityForms[act], { formId: "jskin_missing_form" });
+  b.requires.forms.push("jskin_missing_form");
+  b.requires.plugins.push("com.example.MissingPlugin");
+  b.sensitive.push("activityPlugins.tool1.properties.password");
+  b.subflows = [{ activity: "sub1", target: "other_proc" }];
+  await chooseImport(page, writeTmp("remote.process.json", b));
+  const txt = await page.textContent("#jskin-pcopy-dialog");
+  await page.mouse.move(5, 890);
+  await page.evaluate(() => document.querySelectorAll(".jskin-pcopy-toast").forEach((t) => t.remove()));
+  await shot(page, "pcopy-warnings-dialog", "#jskin-pcopy-dialog .jskin-pcopy-box");
+  for (const s of ["jskin_missing_form", "com.example.MissingPlugin", "activityPlugins.tool1.properties.password", "other_proc", "jskin_remote_proc_"]) {
+    assert(txt.includes(s), "dialog missing " + s);
+  }
+  assert(!txt.includes("Clone」的规则"), "should not be renamed");
+  await page.click("#jskin-pcopy-dialog .btn-secondary");
+  await page.waitForTimeout(500);
+  assert(same(await pbData(page), before), "cancel changed data");
+  await chooseImport(page, writeTmp("bad.json", { kind: "something-else", v: 1 }));
+  const err = await page.textContent("#jskin-pcopy-dialog");
+  assert(/不是流程导出文件/.test(err) && !(await page.$("#jskin-pcopy-dialog .btn-primary")), "bad file dialog: " + err);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  assert(!(await page.$("#jskin-pcopy-dialog")) && same(await pbData(page), before), "bad file changed data / dialog stuck");
+  // skin off removes the buttons
+  await setStore(page, { jogetSkinEnabled: false });
+  await page.waitForTimeout(600);
+  assert(!(await page.$("#jskin-pcopy-group")), "buttons still there with skin off");
+  return `warnings listed (missing form + plugin, re-enter field, subflow, participant renames to jskin_remote_proc_*); cancel / bad file → no change; skin off → buttons removed (${pid})`;
+});
+
 /* ---------- runner ---------- */
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
+// stand-in for moz-extension:// URLs of web_accessible_resources (see STUB runtime.getURL)
+await ctx.route("**/__jskin_ext/**", (route) => {
+  const f = decodeURIComponent(new URL(route.request().url()).pathname.split("/__jskin_ext/")[1] || "");
+  const ok = (manifest.web_accessible_resources || []).some((w) => w.resources.includes(f));
+  return ok ? route.fulfill({ status: 200, contentType: "text/javascript", body: read(f) }) : route.fulfill({ status: 404, body: "" });
+});
 const login = await ctx.newPage();
 await login.goto(`${BASE}/web/console/home`);
 if (await login.locator("#j_username").count()) {

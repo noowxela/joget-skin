@@ -631,3 +631,100 @@ html.joget-skin .property-editor-container:not(.single-page) > .jskin-prop-colla
   top: auto !important;
   height: auto !important;
 }
+
+/* ---------- v1.4.0 process copy (pcopy-content.js): toolbar buttons, dialog, toast ---------- */
+html.joget-skin #jskin-pcopy-group .btn {
+  white-space: nowrap;
+}
+html.joget-skin #jskin-pcopy-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 2000100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-box {
+  width: min(640px, calc(100vw - 40px));
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #1f2937;
+  border-radius: 10px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  font-size: 13px;
+  line-height: 1.5;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-title {
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  border-bottom: 1px solid #e5e7eb;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-body {
+  padding: 12px 18px;
+  overflow: auto;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-info {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0 0 8px;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-info dt {
+  font-weight: 600;
+  color: #6b7280;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-info dd {
+  margin: 0;
+  word-break: break-all;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-section {
+  margin: 10px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f3f4f6;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-section.warn {
+  background: #fff7ed;
+  border-left: 3px solid #f59e0b;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-h {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-section ul {
+  margin: 0;
+  padding-left: 18px;
+  word-break: break-all;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-error {
+  color: #b91c1c;
+  margin: 0;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-note {
+  margin: 10px 0 0;
+  color: #6b7280;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid #e5e7eb;
+}
+html.joget-skin .jskin-pcopy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 2000101;
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}

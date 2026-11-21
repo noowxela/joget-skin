@@ -1,4 +1,4 @@
-# Joget Skin v1.3.10 文档索引
+# Joget Skin v1.4.0 文档索引
 
 Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Builder 和 userview 做整理、布局和可选主题。
 每个功能一份文档，写清楚：做什么、文件和行号、存储键、依赖 Joget 的哪些东西（附 Joget 源码出处）、容易坏的地方、坏了怎么查。
@@ -16,7 +16,8 @@ Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Buil
 | `userview.css` + `themes/indigo/userview.css` | userview 页面 | document_start |
 | `composer.js` | `/jw/web/console/app/*/builders*`（只顶层） | document_idle |
 | `chime-sound.js` + `savechime.js` | `/jw/web/console/app/*/builder/*`（只顶层） | document_idle |
-| `hotkeys.js` + `propcollapse.js` + `edgetoggles.js` | `/jw/web/console/app/*/builder*`（含 `/builders` 和 `/process/builder`） | document_idle |
+| `hotkeys.js` + `propcollapse.js` + `edgetoggles.js` + `pcopy-content.js` | `/jw/web/console/app/*/builder*`（含 `/builders` 和 `/process/builder`） | document_idle |
+| `pcopy-page.js` | 由 `pcopy-content.js` 用 `<script src>` 注入 Process Builder 页面（`web_accessible_resources`） | 第一次显示按钮时 |
 | `popup.html` / `popup.js` | 工具栏弹窗 | — |
 
 所有 CSS 都写在 `html.joget-skin` 之下；`content.js` 拿掉这个 class 就等于整个皮肤关掉。
@@ -35,6 +36,7 @@ Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Buil
 11. [快捷键按钮](11-hotkeys.md)
 12. [属性面板 全部收起/全部展开](12-property-collapse.md)
 13. [属性面板 标签左、输入框右](13-property-rows.md)
+14. [单流程复制（导出 / 导入）](14-process-copy.md)
 
 ## 通用排查步骤
 1. DevTools → Elements：`<html>` 上有没有 `joget-skin`。没有 → 看 [01](01-content-js.md)。
