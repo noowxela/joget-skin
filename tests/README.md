@@ -37,7 +37,7 @@ SHOTS=../joget-skin-shots node tests/run.mjs   # 顺便截图（失败时也会�
 | userview.css | docs/04 |
 | composer: …（4 个） | docs/05 |
 | save chime | docs/06 |
-| popup | docs/07 |
+| popup（开关 / 音效；以及模拟 updates.json 的检查更新：新版本 / 已是最新 / 失败） | docs/07 |
 | left-panel handle、left-panel hotkey | docs/08、docs/11 |
 | quick nav | docs/09 |
 | canvas centred（form / datalist / userview / process）、element select box | docs/10 |

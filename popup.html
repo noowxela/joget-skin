@@ -10,7 +10,7 @@
       }
       body {
         margin: 12px 14px;
-        min-width: 220px;
+        min-width: 260px;
       }
       label {
         display: flex;
@@ -67,10 +67,50 @@
         color: #666;
         font-size: 12px;
       }
+      .update-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .update-status {
+        color: #555;
+        font-size: 12px;
+        text-align: right;
+        flex: 1;
+        min-width: 0;
+      }
+      .update-status a {
+        color: #1d4ed8;
+      }
+      .update-actions {
+        margin-top: 4px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: flex-end;
+      }
+      .update-hint {
+        display: none;
+        margin: 6px 0 0;
+        color: #8a5a00;
+        font-size: 11px;
+      }
+      .update-hint.show {
+        display: block;
+      }
       @media (prefers-color-scheme: dark) {
         .hint,
-        .version {
+        .version,
+        .update-status {
           color: #aaa;
+        }
+        .update-status a {
+          color: #93c5fd;
+        }
+        .update-hint {
+          color: #fbbf24;
         }
       }
     </style>
@@ -83,6 +123,11 @@
       </label>
       <span class="version" id="version"></span>
     </div>
+    <div class="update-row">
+      <button type="button" id="update-check">检查更新</button>
+      <div id="update-status" class="update-status" role="status" aria-live="polite"></div>
+    </div>
+    <p id="update-hint" class="update-hint"></p>
     <label class="row" for="theme">
       <span>主题</span>
       <select id="theme">

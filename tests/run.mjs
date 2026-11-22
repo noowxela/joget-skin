@@ -632,6 +632,65 @@ test("popup: version, 3 sounds, toggles write storage", async (page, ctx) => {
   return `${r.v}; sounds ${r.sounds.join("/")}; toggle → jogetSkinEnabled=false`;
 });
 
+const UPDATES_URL = "https://noowxela.github.io/joget-skin/updates.json";
+const updatesJson = (...versions) => ({
+  addons: {
+    "joget-skin@alexwoon": {
+      updates: versions.map((version) => ({
+        version,
+        update_link: "https://github.com/noowxela/joget-skin/releases/download/v" + version + "/joget-skin-" + version + ".xpi",
+      })),
+    },
+  },
+});
+async function openPopup(ctx, { body, status, abort, lastCheck } = {}) {
+  const p = await ctx.newPage();
+  if (lastCheck != null) {
+    await p.addInitScript((t) => {
+      sessionStorage.setItem("__jskinStubStore", JSON.stringify({ jogetSkinUpdateCheckedAt: t }));
+    }, lastCheck);
+  }
+  await p.addInitScript(STUB);
+  await p.route(UPDATES_URL, (route) => {
+    if (abort) return route.abort("failed");
+    const payload = typeof body === "string" ? body : JSON.stringify(body == null ? updatesJson(manifest.version) : body);
+    return route.fulfill({ status: status || 200, contentType: status && status >= 400 ? "text/plain" : "application/json", body: payload });
+  });
+  await p.goto(pathToFileURL(path.join(EXT, "popup.html")).href);
+  return p;
+}
+
+test("popup: update check shows newer version from updates.json", async (page, ctx) => {
+  const p = await openPopup(ctx, { body: updatesJson("1.4.1", "9.9.9") });
+  await p.waitForFunction(() => /有新版本 v9\.9\.9/.test(document.getElementById("update-status").textContent), null, { timeout: 8000 });
+  const href = await p.getAttribute("#update-changelog", "href");
+  assert(href === "https://noowxela.github.io/joget-skin/changelog.html", "changelog href " + href);
+  assert(await p.locator("#update-now").count(), "missing 立即更新");
+  await p.setViewportSize({ width: 300, height: 360 });
+  await shot(p, "popup-update-newer");
+  await p.close();
+  return "auto-check: 有新版本 v9.9.9 + changelog + 立即更新";
+});
+
+test("popup: update check same version is already latest", async (page, ctx) => {
+  const p = await openPopup(ctx, { body: updatesJson("1.4.0", manifest.version), lastCheck: Date.now() });
+  await p.waitForSelector("#update-check");
+  assert((await p.textContent("#update-status")).trim() === "", "auto-check was not silent: " + await p.textContent("#update-status"));
+  await p.click("#update-check");
+  await p.waitForFunction(() => document.getElementById("update-status").textContent.trim() === "已是最新版", null, { timeout: 8000 });
+  await p.close();
+  return "手动检查：" + manifest.version + " → 已是最新版";
+});
+
+test("popup: update check fetch failure shows reason", async (page, ctx) => {
+  const p = await openPopup(ctx, { status: 500, body: "nope", lastCheck: Date.now() });
+  await p.click("#update-check");
+  await p.waitForFunction(() => document.getElementById("update-status").textContent.includes("检查失败：HTTP 500"), null, { timeout: 8000 });
+  const txt = (await p.textContent("#update-status")).trim();
+  await p.close();
+  return txt;
+});
+
 test("indigo theme: loads together with v1.3.7 layout, canvas still centred", async (page) => {
   await open(page, urls.textForm);
   await inject(page, { theme: true });

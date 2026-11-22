@@ -46,6 +46,14 @@ xpi 放在 GitHub Release 资产里，而不是 Pages 上，免得二进制包�
 
 排查自动更新：在 `about:config` 确认 `extensions.update.enabled` 为 `true`。需要的话可以把 `extensions.update.interval` 从 86400 改到 120（秒）以便测试，测完改回去。然后打开「浏览器控制台」（Browser Console），过滤扩展名或 `updates.json`，看有没有报错。
 
+## 弹窗里检查更新
+
+签名安装之后，除了 `about:addons` 和 Firefox 大约每 24 小时的自动检查，也可以在工具栏弹窗点「检查更新」。弹窗直接 `fetch` Pages 上的 `updates.json`（CORS 已是 `*`，不必加 `host_permissions`），和当前版本比较后提示是否有新版，并链到 `changelog.html`。
+
+「立即更新」在 Firefox 里不能调用 `runtime.requestUpdateCheck`（该 API 在 Firefox 的 schema 里仍是 `unsupported`，[Bug 1740508](https://bugzilla.mozilla.org/show_bug.cgi?id=1740508)）。弹窗会改口，让用户到 `about:addons` 检查，或等自动更新。从 `about:debugging` 临时加载源码不会走 `update_url`，弹窗若能判断（不为此申请 `management` 权限）会给出提示。
+
+详见 [07. 弹窗 popup](07-popup.md)。
+
 ## 文件
 
 | 文件 | 作用 |
