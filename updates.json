@@ -1,0 +1,18 @@
+{
+  "addons": {
+    "joget-skin@alexwoon": {
+      "updates": [
+        {
+          "version": "1.4.1",
+          "update_link": "https://github.com/noowxela/joget-skin/releases/download/v1.4.1/joget-skin-1.4.1.xpi",
+          "update_hash": "sha256:ca0b6edcde89e77df3158ad6fb3b755797de715905cf6ae73e5ce006aa772f95",
+          "applications": {
+            "gecko": {
+              "strict_min_version": "142.0"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
