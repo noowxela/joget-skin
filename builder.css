@@ -726,6 +726,31 @@ html.joget-skin #jskin-ucopy-dialog .jskin-ucopy-note {
   margin: 10px 0 0;
   color: #6b7280;
 }
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-note.warn,
+html.joget-skin #jskin-ucopy-dialog .jskin-ucopy-note.warn {
+  color: #9a3412;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-check,
+html.joget-skin #jskin-ucopy-dialog .jskin-ucopy-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 0;
+  cursor: pointer;
+  font-weight: 500;
+}
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-check input,
+html.joget-skin #jskin-ucopy-dialog .jskin-ucopy-check input {
+  margin-top: 2px;
+}
+html.joget-skin #jskin-ucopy-dialog .jskin-ucopy-checks {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+html.joget-skin #jskin-ucopy-dialog .jskin-ucopy-checks li {
+  margin: 4px 0;
+}
 html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-foot,
 html.joget-skin #jskin-ucopy-dialog .jskin-ucopy-foot {
   display: flex;

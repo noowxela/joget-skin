@@ -1,5 +1,5 @@
 /**
- * Joget Skin — userview / UI copy (export / import), content-script side (v1.4.2).
+ * Joget Skin — userview / UI copy (export / import), content-script side (v1.4.4).
  * Page: Userview Builder /jw/web/console/app/{appId}/{ver}/userview/builder/{id} (top frame only).
  * Loaded on every builder page (manifest "builder*") because Joget can switch builders
  * without a reload; the buttons exist only while the path is the userview builder.
@@ -11,7 +11,7 @@
  *   marker, accepted only from this window and this origin.
  * - Export downloads <appId>_<ver>_<userviewId>.userview.json.
  * - Import: pick a file -> page checks it (no writes) -> dialog lists the new id, missing
- *   forms / datalists / processes / userviews / plugins / env vars, and fields to re-enter
+ *   missing deps as a checklist, dangling UI refs, and fields to re-enter
  *   -> "导入" creates a NEW userview in the current app and writes its definition.
  *   The open userview is never overwritten. The new UI is persisted immediately (Joget's
  *   userview Save cannot create a new id); discard it in App Composer if you do not want it.
@@ -112,7 +112,7 @@
     if (!(await ensureReady())) {
       return { ok: false, error: "页面脚本没有回应（ucopy-page.js 没加载？）" };
     }
-    const timeout = cmd === "apply" ? 60000 : 30000;
+    const timeout = cmd === "apply" ? 180000 : cmd === "export" ? 90000 : 45000;
     return request(cmd, extra, timeout);
   }
 
@@ -176,6 +176,54 @@
   function showError(title, msg) {
     openDialog(title, (body) => body.append(el("p", "jskin-ucopy-error", msg)), [["关闭", "btn-secondary", closeDialog]]);
   }
+  function itemId(it) {
+    return typeof it === "string" ? it : (it && (it.id || it.locale) || "");
+  }
+  function itemLabel(it) {
+    if (typeof it === "string") {
+      return it;
+    }
+    if (!it) {
+      return "";
+    }
+    const id = it.id || it.locale || "";
+    const note = it.note ? " — " + it.note : "";
+    const path = it.path ? "  (" + it.path + ")" : "";
+    return id + path + note;
+  }
+  function checkSection(body, title, items, depName) {
+    if (!items || !items.length) {
+      return;
+    }
+    const s = el("div", "jskin-ucopy-section warn");
+    s.append(el("div", "jskin-ucopy-h", title + "（" + items.length + "）"));
+    const ul = el("ul", "jskin-ucopy-checks");
+    items.forEach((it) => {
+      const id = itemId(it);
+      const canCreate = typeof it === "object" ? it.canCreate !== false : true;
+      const lab = el("label", "jskin-ucopy-check");
+      const cb = el("input");
+      cb.type = "checkbox";
+      cb.dataset.dep = depName;
+      cb.dataset.id = id;
+      cb.checked = canCreate;
+      cb.disabled = !canCreate;
+      lab.append(cb, document.createTextNode(" " + itemLabel(it) + (canCreate ? "" : "（无法自动创建）")));
+      const li = el("li");
+      li.append(lab);
+      ul.append(li);
+    });
+    s.append(ul);
+    body.append(s);
+  }
+  function formatDangling(items) {
+    return (items || []).map((it) => {
+      if (typeof it === "string") {
+        return it;
+      }
+      return (it.id || "") + (it.path ? "  ← " + it.path : "") + (it.className ? "  [" + it.className.split(".").pop() + "]" : "");
+    });
+  }
   function fillPlan(body, p) {
     const src = p.source || {};
     const info = el("dl", "jskin-ucopy-info");
@@ -191,22 +239,64 @@
     row("当前打开的 UI", (p.currentId || "") + (p.currentName ? "  「" + p.currentName + "」" : "") + "（不会改写）");
     row("导入为新 UI", p.newId + "  「" + p.newName + "」" + (p.renamed ? "（id 已存在，按 Joget 复制表单/列表的规则加了后缀）" : ""));
     body.append(info);
-    section(body, "本地缺少的表单", p.missingForms, "warn");
-    section(body, "本地缺少的列表（Datalist）", p.missingDatalists, "warn");
-    section(body, "本地缺少的流程", p.missingProcesses, "warn");
+    checkSection(body, "本地缺少的表单", p.missingForms, "forms");
+    checkSection(body, "本地缺少的列表（Datalist）", p.missingDatalists, "datalists");
+    checkSection(body, "本地缺少的 Theme Builder", p.missingThemes, "themes");
+    checkSection(body, "本地缺少的 App Resource", p.missingResources, "appResources");
+    checkSection(body, "本地缺少的环境变量", p.missingEnv, "envVariables");
+    checkSection(body, "本地缺少的 i18n 文案", (p.missingMessages || []).map((m) => ({
+      id: m.locale || m.id,
+      note: (m.keys && m.keys.length ? m.keys.length + " 条" : m.note) || "",
+      canCreate: m.canCreate !== false,
+    })), "messages");
+    checkSection(body, "本地缺少的其他 UI（Userview）", p.missingUserviews, "userviews");
+    section(body, "来源里也没有的 UI 引用（不会创建）", formatDangling(p.danglingUserviews), "warn");
+    section(body, "本地缺少的流程（只报告，不自动复制；请用流程复制）", p.missingProcesses, "warn");
     section(body, "本地缺少的活动（Run Process 等）", (p.missingActivities || []).map((a) => (a.processId || "") + " / " + (a.activityId || "")), "warn");
-    section(body, "本地缺少的其他 Userview", p.missingUserviews, "warn");
     section(body, "本机没有的插件", p.missingPlugins, "warn");
-    section(body, "本地缺少的环境变量", p.missingEnv, "warn");
+    const sb = p.serverBound || {};
+    const bound = [];
+    (sb.groups || []).forEach((x) => bound.push("用户组 " + x));
+    (sb.orgs || []).forEach((x) => bound.push("组织 " + x));
+    (sb.departments || []).forEach((x) => bound.push("部门 " + x));
+    (sb.roles || []).forEach((x) => bound.push("角色 " + x));
+    (p.permissionPlugins || []).forEach((x) => bound.push("权限插件 " + x));
+    section(body, "服务器侧权限对象（只报告，不会创建）", bound, "warn");
+    section(body, "已存在、将跳过（不会覆盖）", [].concat(
+      (p.existingForms || []).map((x) => "表单 " + x),
+      (p.existingDatalists || []).map((x) => "列表 " + x),
+      (p.existingThemes || []).map((x) => "Theme " + x),
+      (p.existingResources || []).map((x) => "资源 " + x),
+      (p.existingEnv || []).map((x) => "环境变量 " + x),
+      (p.existingUserviews || []).map((x) => "UI " + x),
+      (p.existingMessages || []).map((m) => "i18n " + itemLabel(m)),
+    ));
     if (p.catalogNotes && p.catalogNotes.length) {
       section(body, "无法完成的检查", p.catalogNotes, "warn");
     }
-    section(body, "导出时清空的敏感字段，导入后请重新填写", p.sensitive, "warn");
+    if (p.includeSensitive) {
+      section(body, "此文件包含明文敏感字段，导入会写入这些值", p.sensitive, "warn");
+    } else {
+      section(body, "导出时清空的敏感字段，导入后请重新填写", p.sensitive, "warn");
+    }
     if (src.unsavedChanges) {
       body.append(el("p", "jskin-ucopy-note", "导出时远端设计器可能有未保存的修改，包里是当时内存里的内容。"));
     }
     body.append(el("p", "jskin-ucopy-note",
-      "导入会在当前应用中创建一个新的 Userview，并把定义写入服务器（不会改写当前打开的 UI）。Joget 的 UI 保存接口不能新建 id，所以这里无法做到「只改设计器、等你按 Save」。若不想保留，请到 App Composer 删除这个新 Userview。"));
+      "勾选的缺失项会在当前应用中创建（已存在的不会覆盖）。导入还会创建一个新的 UI（Userview），并把定义写入服务器（不会改写当前打开的 UI）。Joget 的 UI 保存接口不能新建 id，所以这里无法做到「只改设计器、等你按 Save」。若不想保留，请到 App Composer 删除这个新 UI。"));
+  }
+  function collectSelected(root) {
+    const selected = { forms: [], datalists: [], envVariables: [], themes: [], appResources: [], userviews: [], messages: [] };
+    root.querySelectorAll("input[type='checkbox'][data-dep]").forEach((cb) => {
+      if (!cb.checked || cb.disabled) {
+        return;
+      }
+      const k = cb.dataset.dep;
+      if (selected[k]) {
+        selected[k].push(cb.dataset.id);
+      }
+    });
+    return selected;
   }
 
   /* ---------- actions ---------- */
@@ -214,28 +304,55 @@
     if (busy) {
       return;
     }
-    busy = true;
-    btn.disabled = true;
-    try {
-      const r = await ask("export");
-      if (!r.ok) {
-        showError("导出此 UI", r.error || "导出失败");
-        return;
-      }
-      const blob = new Blob([JSON.stringify(r.bundle, null, 2)], { type: "application/json" });
-      const a = el("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = r.fileName;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      const n = (r.bundle.sensitive || []).length;
-      toast("已导出 " + r.fileName + (n ? "（" + n + " 个敏感字段已清空）" : ""));
-    } finally {
-      btn.disabled = false;
-      busy = false;
-    }
+    openDialog("导出此 UI", (body) => {
+      const lab = el("label", "jskin-ucopy-check");
+      const cb = el("input");
+      cb.type = "checkbox";
+      cb.id = "jskin-ucopy-include-sensitive";
+      cb.checked = false;
+      lab.append(cb, document.createTextNode(" 包含敏感字段"));
+      body.append(lab);
+      body.append(el("p", "jskin-ucopy-note warn", "勾选后，导出的 JSON 会包含密码、密钥等明文。请妥善保管这个文件，不要发给不可信的人。"));
+    }, [
+      ["取消", "btn-secondary", closeDialog],
+      ["导出", "btn-primary", async (b) => {
+        if (busy) {
+          return;
+        }
+        busy = true;
+        b.disabled = true;
+        if (btn) {
+          btn.disabled = true;
+        }
+        try {
+          const cbInc = document.getElementById("jskin-ucopy-include-sensitive");
+          const includeSensitive = !!(cbInc && cbInc.checked);
+          const r = await ask("export", { includeSensitive });
+          if (!r.ok) {
+            showError("导出此 UI", r.error || "导出失败");
+            return;
+          }
+          const blob = new Blob([JSON.stringify(r.bundle, null, 2)], { type: "application/json" });
+          const a = el("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = r.fileName;
+          document.body.append(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+          closeDialog();
+          const n = (r.bundle.sensitive || []).length;
+          const kept = !!(r.bundle.includeSensitive);
+          toast("已导出 " + r.fileName + (kept ? "（已包含敏感字段明文）" : (n ? "（" + n + " 个敏感字段已清空）" : "")));
+        } finally {
+          b.disabled = false;
+          if (btn) {
+            btn.disabled = false;
+          }
+          busy = false;
+        }
+      }],
+    ]);
   }
   function toast(msg) {
     document.querySelectorAll(".jskin-ucopy-toast").forEach((x) => x.remove());
@@ -282,7 +399,8 @@
         ["取消", "btn-secondary", closeDialog],
         ["导入", "btn-primary", async (b) => {
           b.disabled = true;
-          const a = await ask("apply", { text });
+          const selected = collectSelected(document.getElementById(DIALOG_ID) || document);
+          const a = await ask("apply", { text, selected });
           if (!a.ok) {
             showError("导入 UI", a.error);
             return;
@@ -348,8 +466,8 @@
       return b;
     };
     group.append(
-      mk(EXPORT_ID, "⬇ 导出此 UI", "把当前打开的 Userview 下载成 JSON（含依赖清单，敏感字段会清空）", doExport),
-      mk(IMPORT_ID, "⬆ 导入 UI", "从 JSON 文件导入为当前 app 里的一个新 Userview（会写入服务器，不改写当前打开的 UI）", doImport),
+      mk(EXPORT_ID, "⬇ 导出此 UI", "把当前打开的 UI（Userview）下载成 JSON（含依赖；默认清空敏感字段）", doExport),
+      mk(IMPORT_ID, "⬆ 导入 UI", "从 JSON 文件导入为当前 app 里的一个新 UI（Userview）（会写入服务器，不改写当前打开的 UI）", doImport),
     );
     placeGroup(group, after);
   }

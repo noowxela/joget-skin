@@ -213,7 +213,11 @@
     } else {
       section(body, "本地没装的插件", p.missingPlugins, "warn");
     }
-    section(body, "导出时清空的敏感字段，导入后请重新填写", p.sensitive, "warn");
+    if (p.includeSensitive) {
+      section(body, "此文件包含明文敏感字段，导入会写入这些值", p.sensitive, "warn");
+    } else {
+      section(body, "导出时清空的敏感字段，导入后请重新填写", p.sensitive, "warn");
+    }
     section(body, "提醒", p.warnings, "warn");
     section(body, "会加到本地的 Application", (p.addApps || []).map((a) => a["-Id"]));
     section(body, "按 Save 会被拒绝：设计无效（Joget 会检查这个 app 里的全部流程）",
@@ -246,28 +250,52 @@
 
   /* ---------- actions ---------- */
   async function doExport(btn) {
-    btn.disabled = true;
-    try {
-      const r = await ask("export");
-      if (!r.ok) {
-        showError("导出此流程", r.error);
-        return;
-      }
-      const blob = new Blob([JSON.stringify(r.bundle, null, 2) + "\n"], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = el("a");
-      a.href = url;
-      a.download = r.fileName;
-      a.style.display = "none";
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      const n = (r.bundle.sensitive || []).length;
-      toast("已导出 " + r.fileName + (n ? "（" + n + " 个敏感字段已清空）" : ""));
-    } finally {
-      btn.disabled = false;
-    }
+    openDialog("导出此流程", (body) => {
+      const lab = el("label", "jskin-pcopy-check");
+      const cb = el("input");
+      cb.type = "checkbox";
+      cb.id = "jskin-pcopy-include-sensitive";
+      cb.checked = false;
+      lab.append(cb, document.createTextNode(" 包含敏感字段"));
+      body.append(lab);
+      body.append(el("p", "jskin-pcopy-note warn", "勾选后，导出的 JSON 会包含密码、密钥等明文。请妥善保管这个文件，不要发给不可信的人。"));
+    }, [
+      ["取消", "btn-secondary", closeDialog],
+      ["导出", "btn-primary", async (b) => {
+        b.disabled = true;
+        if (btn) {
+          btn.disabled = true;
+        }
+        try {
+          const cbInc = document.getElementById("jskin-pcopy-include-sensitive");
+          const includeSensitive = !!(cbInc && cbInc.checked);
+          const r = await ask("export", { includeSensitive });
+          if (!r.ok) {
+            showError("导出此流程", r.error);
+            return;
+          }
+          const blob = new Blob([JSON.stringify(r.bundle, null, 2) + "\n"], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = el("a");
+          a.href = url;
+          a.download = r.fileName;
+          a.style.display = "none";
+          document.body.append(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 30000);
+          closeDialog();
+          const n = (r.bundle.sensitive || []).length;
+          const kept = !!(r.bundle.includeSensitive);
+          toast("已导出 " + r.fileName + (kept ? "（已包含敏感字段明文）" : (n ? "（" + n + " 个敏感字段已清空）" : "")));
+        } finally {
+          b.disabled = false;
+          if (btn) {
+            btn.disabled = false;
+          }
+        }
+      }],
+    ]);
   }
   function toast(msg) {
     document.querySelectorAll(".jskin-pcopy-toast").forEach((x) => x.remove());

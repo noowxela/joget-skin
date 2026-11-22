@@ -761,9 +761,22 @@ async function openProcessBuilder(page) {
   await inject(page);
   await page.waitForSelector("#jskin-tool-btn", { timeout: 8000 });
 }
-async function exportBundle(page) {
+async function exportBundle(page, { includeSensitive = false, shotName } = {}) {
   await openToolMenu(page);
-  const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.click("#jskin-pcopy-export")]);
+  await page.click("#jskin-pcopy-export");
+  await page.waitForSelector("#jskin-pcopy-dialog #jskin-pcopy-include-sensitive", { timeout: 10000 });
+  const defaultOn = await page.$eval("#jskin-pcopy-include-sensitive", (el) => el.checked);
+  if (defaultOn) throw new Error("pcopy sensitive checkbox should default off");
+  if (includeSensitive) {
+    await page.check("#jskin-pcopy-include-sensitive");
+  }
+  if (shotName) {
+    await shot(page, shotName, "#jskin-pcopy-dialog .jskin-pcopy-box");
+  }
+  const [dl] = await Promise.all([
+    page.waitForEvent("download", { timeout: 20000 }),
+    page.click("#jskin-pcopy-dialog .btn-primary"),
+  ]);
   const file = path.join(os.tmpdir(), "jskin-" + Date.now() + "-" + dl.suggestedFilename());
   await dl.saveAs(file);
   return { file, name: dl.suggestedFilename(), bundle: JSON.parse(fs.readFileSync(file, "utf8")) };
@@ -987,9 +1000,22 @@ async function openUserviewBuilder(page, url) {
   await inject(page);
   await page.waitForSelector("#jskin-tool-btn", { timeout: 8000 });
 }
-async function exportUvBundle(page) {
+async function exportUvBundle(page, { includeSensitive = false, shotName } = {}) {
   await openToolMenu(page);
-  const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.click("#jskin-ucopy-export")]);
+  await page.click("#jskin-ucopy-export");
+  await page.waitForSelector("#jskin-ucopy-dialog #jskin-ucopy-include-sensitive", { timeout: 10000 });
+  const defaultOn = await page.$eval("#jskin-ucopy-include-sensitive", (el) => el.checked);
+  if (defaultOn) throw new Error("ucopy sensitive checkbox should default off");
+  if (includeSensitive) {
+    await page.check("#jskin-ucopy-include-sensitive");
+  }
+  if (shotName) {
+    await shot(page, shotName, "#jskin-ucopy-dialog .jskin-ucopy-box");
+  }
+  const [dl] = await Promise.all([
+    page.waitForEvent("download", { timeout: 90000 }),
+    page.click("#jskin-ucopy-dialog .btn-primary"),
+  ]);
   const file = path.join(os.tmpdir(), "jskin-" + Date.now() + "-" + dl.suggestedFilename());
   await dl.saveAs(file);
   return { file, name: dl.suggestedFilename(), bundle: JSON.parse(fs.readFileSync(file, "utf8")) };
@@ -1119,7 +1145,7 @@ test("userview copy: import into the same app creates a new userview, does not o
     if (!CB || CB.builderType !== "userview" || !CB.data || !CB.data.properties) return false;
     const id = CB.id || CB.data.properties.id;
     return id && id !== oldId ? "OK:" + id : false;
-  }, before.id, { timeout: 40000 });
+  }, before.id, { timeout: 120000 });
   const waitMsg = await page.evaluate(() => {
     const err = document.querySelector("#jskin-ucopy-dialog .jskin-ucopy-error");
     if (err && err.textContent) return "ERR:" + err.textContent;
@@ -1177,6 +1203,7 @@ test("userview copy: warnings dialog (missing deps), cancel and bad file change 
   assert(/jskin_missing_list/.test(txt), "missing list not warned: " + txt);
   assert(/jskin_missing_process/.test(txt), "missing process not warned: " + txt);
   assert(/jskin_missing_userview/.test(txt), "missing userview not warned: " + txt);
+  assert(/来源里也没有的 UI 引用/.test(txt), "dangling UI section missing: " + txt.slice(0, 500));
   assert(/org\.jskin\.missing\.DoesNotExistPlugin/.test(txt), "missing plugin not warned: " + txt);
   assert(!/org\.joget\.apps\.userview\.model\.Userview[<\s]/.test(txt) && !/UserviewCategory/.test(txt), "built-in userview types flagged as missing plugins: " + txt);
   assert(/jskin_missing_env/.test(txt), "missing env not warned: " + txt);
@@ -1240,7 +1267,7 @@ test("userview copy: save in a temporary app copy then delete the app", async (p
       if (!CB || CB.appId !== "jskinucopytmp" || !CB.data || !CB.data.properties) return false;
       const id = CB.id || CB.data.properties.id;
       return id && id !== oldId;
-    }, originUv.id, { timeout: 40000 });
+    }, originUv.id, { timeout: 180000 });
     const imported = await uvInfo(page);
     // click Save (definition is already persisted; this confirms Save still works)
     const saveBtn = await page.$("#save-btn, #save-btn-toolbar, a#save-btn, button#save-btn");
@@ -1275,6 +1302,215 @@ test("userview copy: save in a temporary app copy then delete the app", async (p
   }
 });
 
+
+
+test("userview copy: opt-in keeps planted dummy secrets; default still blanks them", async (page) => {
+  await openUserviewBuilder(page);
+  const DUMMY = "jskin-dummy-secret-value";
+  await page.evaluate((dummy) => {
+    if (!CustomBuilder.data.setting) CustomBuilder.data.setting = { className: "", properties: {} };
+    if (!CustomBuilder.data.setting.properties) CustomBuilder.data.setting.properties = {};
+    CustomBuilder.data.setting.properties.jskinTestPassword = dummy;
+    CustomBuilder.json = JSON.stringify(CustomBuilder.data);
+  }, DUMMY);
+  const off = await exportUvBundle(page, { shotName: "ucopy-export-sensitive-off" });
+  await page.evaluate((dummy) => {
+    CustomBuilder.data.setting.properties.jskinTestPassword = dummy;
+    CustomBuilder.json = JSON.stringify(CustomBuilder.data);
+  }, DUMMY);
+  const on = await exportUvBundle(page, { includeSensitive: true, shotName: "ucopy-export-sensitive-on" });
+  await page.evaluate(() => {
+    if (CustomBuilder.data.setting && CustomBuilder.data.setting.properties) {
+      delete CustomBuilder.data.setting.properties.jskinTestPassword;
+      CustomBuilder.json = JSON.stringify(CustomBuilder.data);
+    }
+  });
+  const offPw = off.bundle.userview.setting && off.bundle.userview.setting.properties && off.bundle.userview.setting.properties.jskinTestPassword;
+  const onPw = on.bundle.userview.setting && on.bundle.userview.setting.properties && on.bundle.userview.setting.properties.jskinTestPassword;
+  assert(off.bundle.includeSensitive === false && offPw === "", "default export must blank the dummy password");
+  assert(on.bundle.includeSensitive === true && onPw === DUMMY, "opt-in export did not keep the planted dummy password");
+  return "default blanks dummy password; opt-in keeps it; checkbox defaults off";
+});
+
+test("process copy: opt-in keeps planted dummy secrets; default still blanks them", async (page) => {
+  await openProcessBuilder(page);
+  const DUMMY = "jskin-dummy-secret-value";
+  await page.evaluate((dummy) => {
+    const D = CustomBuilder.data;
+    const pid = ProcessBuilder.currentProcessData.properties.id;
+    const key = Object.keys(D.activityPlugins || {}).find((k) => k.indexOf(pid + "::") === 0);
+    if (!D.activityPlugins) D.activityPlugins = {};
+    const slot = key || (pid + "::jskinDummy");
+    if (!D.activityPlugins[slot]) D.activityPlugins[slot] = { properties: {} };
+    if (!D.activityPlugins[slot].properties) D.activityPlugins[slot].properties = {};
+    D.activityPlugins[slot].properties.jskinTestPassword = dummy;
+    window.__jskinPcopyDummySlot = slot;
+  }, DUMMY);
+  const off = await exportBundle(page, { shotName: "pcopy-export-sensitive-off" });
+  await page.evaluate((dummy) => {
+    const slot = window.__jskinPcopyDummySlot;
+    CustomBuilder.data.activityPlugins[slot].properties.jskinTestPassword = dummy;
+  }, DUMMY);
+  const on = await exportBundle(page, { includeSensitive: true, shotName: "pcopy-export-sensitive-on" });
+  await page.evaluate(() => {
+    const slot = window.__jskinPcopyDummySlot;
+    if (slot && CustomBuilder.data.activityPlugins && CustomBuilder.data.activityPlugins[slot] && CustomBuilder.data.activityPlugins[slot].properties) {
+      delete CustomBuilder.data.activityPlugins[slot].properties.jskinTestPassword;
+    }
+  });
+  const findPw = (bundle) => {
+    const maps = bundle.activityPlugins || {};
+    for (const k of Object.keys(maps)) {
+      const v = maps[k] && maps[k].properties && maps[k].properties.jskinTestPassword;
+      if (v !== undefined) return v;
+    }
+    return undefined;
+  };
+  assert(off.bundle.includeSensitive === false && findPw(off.bundle) === "", "default process export must blank the dummy password");
+  assert(on.bundle.includeSensitive === true && findPw(on.bundle) === DUMMY, "opt-in process export did not keep the planted dummy password");
+  return "process copy: default blanks dummy password; opt-in keeps it";
+});
+
+async function deleteTempApp(page, id) {
+  await csrfPost(page, `${BASE}/web/console/app/${id}/latest/delete`, {}).catch(() => {});
+  await csrfPost(page, `${BASE}/web/console/app/${id}/1/delete`, {}).catch(() => {});
+}
+
+test("userview copy: dashboard is not a missing UI; theme and resources copy into a temp app", async (page) => {
+  const SRC = "jskinuc2src";
+  const DST = "jskinuc2dst";
+  const srcApp = "expenseclaim";
+  await openUserviewBuilder(page);
+  let apps = await listAppIds(page);
+  assert(apps.includes(srcApp), "expenseclaim is not on this Joget: " + apps);
+  for (const id of [SRC, DST]) {
+    if (apps.includes(id)) {
+      await deleteTempApp(page, id);
+    }
+  }
+  apps = await listAppIds(page);
+  const beforeApps = apps.slice();
+  assert(!beforeApps.includes(SRC) && !beforeApps.includes(DST), "could not remove leftover temp apps: " + beforeApps);
+  try {
+    const c1 = await csrfPost(page, `${BASE}/web/console/app/submit`, { type: "duplicate", copyAppId: srcApp, id: SRC, name: "jskin uc2 src" });
+    const after1 = await listAppIds(page);
+    if (!after1.includes(SRC)) {
+      throw new Error("src temp app not created: HTTP " + c1.status + " " + String(c1.text || "").slice(0, 300));
+    }
+    // dest: prefer a copy of study_mac (no theme_expenses). Fallback: empty-ish copy of crm, which also lacks that theme.
+    const destBase = after1.includes("study_mac") ? "study_mac" : APP;
+    const c2 = await csrfPost(page, `${BASE}/web/console/app/submit`, { type: "duplicate", copyAppId: destBase, id: DST, name: "jskin uc2 dst" });
+    const after2 = await listAppIds(page);
+    if (!after2.includes(DST)) {
+      throw new Error("dst temp app not created: HTTP " + c2.status + " " + String(c2.text || "").slice(0, 300) + " base=" + destBase);
+    }
+
+    await openUserviewBuilder(page, `${BASE}/web/console/app/${SRC}/1/userview/builder/home`);
+    const { file, bundle } = await exportUvBundle(page);
+    const reqUv = (bundle.requires && bundle.requires.userviews) || [];
+    const dangling = (bundle.requires && bundle.requires.danglingUserviews) || [];
+    assert(!reqUv.includes("dashboard"), "dashboard listed as a copyable UI: " + JSON.stringify(reqUv));
+    assert(!dangling.some((d) => (d && d.id) === "dashboard"), "dashboard listed as dangling: " + JSON.stringify(dangling));
+    const themeClass = bundle.userview && bundle.userview.setting && bundle.userview.setting.properties
+      && bundle.userview.setting.properties.theme && bundle.userview.setting.properties.theme.className;
+    assert(themeClass === "org.joget.plugin.enterprise.BuilderTheme.theme_expenses", "unexpected theme class: " + themeClass);
+    assert(bundle.requires.themes && bundle.requires.themes.includes("theme_expenses"), "theme id not in requires: " + JSON.stringify(bundle.requires.themes));
+    const bundledThemeIds = (bundle.dependencies && bundle.dependencies.themes || []).map((t) => t.id);
+    assert(bundledThemeIds.includes("theme_expenses"), "theme_expenses not bundled (failed=" + JSON.stringify((bundle.dependencies && bundle.dependencies.failed && bundle.dependencies.failed.themes) || []) + ")");
+    const res = (bundle.requires && bundle.requires.appResources) || [];
+    assert(res.includes("expensesClaim_logo.png"), "logo resource not scanned: " + JSON.stringify(res));
+
+    // open dest builder: first userview of dest app
+    await openUserviewBuilder(page, `${BASE}/web/console/app/${DST}/1/userview/builder/home`);
+    // if dest has no home, try first id from options
+    const destUv = await uvInfo(page).catch(() => null);
+    if (!destUv || destUv.appId !== DST) {
+      const first = await page.evaluate(async () => {
+        const url = CustomBuilder.contextPath + "/web/json/console/app/" + CustomBuilder.appId + "/" + CustomBuilder.appVersion + "/userview/options";
+        const r = await fetch(url, { credentials: "same-origin" });
+        const j = await r.json();
+        const arr = Array.isArray(j) ? j : (j.data || []);
+        return (arr[0] && (arr[0].value || arr[0].id)) || "";
+      }).catch(() => "");
+      if (first) {
+        await openUserviewBuilder(page, `${BASE}/web/console/app/${DST}/1/userview/builder/${first}`);
+      }
+    }
+
+    // confirm dest does not already have the theme (otherwise the test wouldn't prove copy)
+    const destHadTheme = await page.evaluate(async () => {
+      const url = CustomBuilder.contextPath + "/web/json/console/app/" + CustomBuilder.appId + "/" + CustomBuilder.appVersion + "/cbuilder/theme/options";
+      const r = await fetch(url, { credentials: "same-origin" });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const arr = Array.isArray(j) ? j : (j.data || j.options || []);
+      return arr.map((x) => (typeof x === "string" ? x : (x && (x.value || x.id)))).filter(Boolean).includes("theme_expenses");
+    });
+    if (destHadTheme) {
+      throw new Error("dest already has theme_expenses (base app unexpected)");
+    }
+
+    await chooseUvImport(page, file);
+    const txt = await page.textContent("#jskin-ucopy-dialog");
+    const missingUvChunk = (txt.split("本地缺少的其他 UI（Userview）")[1] || "").split("来源里也没有")[0];
+    assert(missingUvChunk.indexOf("dashboard") < 0, "dashboard flagged as missing other UI: " + missingUvChunk.slice(0, 400));
+    assert(/theme_expenses/.test(txt) || /本地缺少的 Theme Builder/.test(txt), "theme not in checklist: " + txt.slice(0, 800));
+    await page.evaluate(() => document.querySelectorAll(".jskin-ucopy-toast").forEach((t) => t.remove()));
+    await shot(page, "ucopy-import-checklist", "#jskin-ucopy-dialog .jskin-ucopy-box");
+    const beforeId = (await uvInfo(page)).id;
+    await page.click("#jskin-ucopy-dialog .btn-primary");
+    await page.waitForFunction((oldId) => {
+      const err = document.querySelector("#jskin-ucopy-dialog .jskin-ucopy-error");
+      if (err && err.textContent) return "ERR:" + err.textContent;
+      const CB = window.CustomBuilder;
+      if (!CB || CB.appId !== "jskinuc2dst" || !CB.data || !CB.data.properties) return false;
+      const id = CB.id || CB.data.properties.id;
+      return id && id !== oldId ? "OK:" + id : false;
+    }, beforeId, { timeout: 180000 });
+    const waitMsg = await page.evaluate(() => {
+      const err = document.querySelector("#jskin-ucopy-dialog .jskin-ucopy-error");
+      if (err && err.textContent) return "ERR:" + err.textContent;
+      const CB = window.CustomBuilder;
+      const id = CB && (CB.id || (CB.data && CB.data.properties && CB.data.properties.id));
+      return "OK:" + id;
+    });
+    if (waitMsg.indexOf("ERR:") === 0) throw new Error(waitMsg.slice(4));
+    const imported = await uvInfo(page);
+    await waitUvReady(page, imported.id);
+    const afterTheme = imported.json.setting && imported.json.setting.properties && imported.json.setting.properties.theme;
+    assert(afterTheme && afterTheme.className === "org.joget.plugin.enterprise.BuilderTheme.theme_expenses",
+      "imported theme class missing: " + (afterTheme && afterTheme.className));
+    const destThemes = await page.evaluate(async () => {
+      const url = CustomBuilder.contextPath + "/web/json/console/app/" + CustomBuilder.appId + "/" + CustomBuilder.appVersion + "/cbuilder/theme/options";
+      const r = await fetch(url, { credentials: "same-origin" });
+      const j = await r.json();
+      const arr = Array.isArray(j) ? j : (j.data || j.options || []);
+      return arr.map((x) => (typeof x === "string" ? x : (x && (x.value || x.id)))).filter(Boolean);
+    });
+    assert(destThemes.includes("theme_expenses"), "theme_expenses not created in dest: " + destThemes);
+    // logo should be fetchable
+    const logoOk = await page.evaluate(async () => {
+      const url = CustomBuilder.contextPath + "/web/app/" + CustomBuilder.appId + "/resources/" + encodeURIComponent("expensesClaim_logo.png");
+      const r = await fetch(url, { credentials: "same-origin" });
+      return r.ok ? r.status : r.status;
+    });
+    assert(logoOk === 200, "logo resource not available on dest: HTTP " + logoOk);
+    await shot(page, "ucopy-imported-theme");
+    return `dashboard not flagged; theme+logo copied ${srcApp}/home -> ${DST}/${imported.id}; destBase=${destBase}`;
+  } finally {
+    await deleteTempApp(page, SRC);
+    await deleteTempApp(page, DST);
+    const leftover = await listAppIds(page).catch(() => null);
+    if (leftover && (leftover.includes(SRC) || leftover.includes(DST))) {
+      await open(page, urls.userview).catch(() => {});
+      await deleteTempApp(page, SRC);
+      await deleteTempApp(page, DST);
+    }
+    const afterApps = await listAppIds(page);
+    assert(!afterApps.includes(SRC) && !afterApps.includes(DST), "temp apps still present: " + afterApps);
+    assert(JSON.stringify(afterApps) === JSON.stringify(beforeApps), "local apps changed: before=" + beforeApps + " after=" + afterApps);
+  }
+});
 
 /* ---------- v1.4.3 Canvas Controls ---------- */
 test("canvas controls: hidden by default, toolbar toggles and persists, x closes, skin off restores", async (page) => {

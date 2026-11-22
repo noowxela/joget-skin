@@ -4,6 +4,25 @@ Joget Skin 的用户可见变更，按版本从新到旧排列。日期为马来
 
 1.4.1 起可在 [GitHub Pages](https://noowxela.github.io/joget-skin/) 查看本页，也可直接阅读仓库里的这份文件。
 
+## 1.4.4 — 2026-11-22
+
+### 新增
+- UI / 流程导出前会弹出选项：「包含敏感字段」默认关闭。勾选后，导出的 JSON 会带上密码、密钥等明文（旁边有警告：请妥善保管，不要发给不可信的人）。不勾选时仍按字段名清空。导入时只有文件里带了这些值才会写入。
+- UI 导出会打包并在导入时按需创建：表单、列表（Datalist）、Theme Builder、App Resource（logo / 背景图等）、环境变量、i18n 文案。导入确认框里按类型列出清单，默认勾选本地缺少的项；已经存在的会跳过，不会覆盖。
+- 环境变量的值只在勾选「包含敏感字段」时写入文件；否则只创建空变量（避免把密钥带出去）。
+
+### 改进
+- 界面文案把 Userview 写成「UI」，必要时括号里保留 Userview，例如「本地缺少的其他 UI（Userview）」。代码里的 id / kind 没有改。
+- 导入确认框会区分「本地缺少的其他 UI」（来源应用里确实存在、可以复制）和「来源里也没有的 UI 引用」（悬空，不会创建）。
+
+### 修复
+- 导出 Expenses Claim 的 `home` 时，不再把 Dashboard 菜单插件（`org.joget.plugin.enterprise.DashboardMenu`）的 `properties.userviewId = dashboard` 误报成缺少的 Userview。这不是指向另一个 UI 的链接。
+- 使用 Theme Builder 主题（例如 `org.joget.plugin.enterprise.BuilderTheme.theme_expenses`）时，导入会同时创建 Theme Builder 定义并上传 `#appResource...#` 引用的文件。以前只带上了 userview JSON 里的 theme 属性，目标应用没有这份 Theme Builder，打开后会被冲掉，看起来就像主题没复制过去。
+
+### 说明
+- 流程（Run Process 等引用）目前只在确认框里列出，不自动复制定义；需要的话请用流程复制。
+- 权限里的用户组 / 组织 / 部门 / 角色，以及本机没有的权限插件，只报告，不会在目标应用里创建。
+
 ## 1.4.3 — 2026-11-22
 
 ### 新增

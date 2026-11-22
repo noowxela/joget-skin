@@ -40,7 +40,7 @@
 ```
 - 三张表的 key 去掉了 `processId::` 前缀，导入时按新的流程 id 加回去。
 - `requires` 只是清单（表单不会打进包里）。表单 = `activityForms.*.formId` + 属性里的 `formDefId` / `formId`；插件 = 所有 `className` + 参与者 `type:"plugin"` 的 `value`。
-- **敏感字段**：属性名像 password / passwd / secret / token / apiKey / privateKey / credential / authorization / username / smtpUser 的非空字符串，导出时清空，路径记在 `sensitive`。只是 `#envVariable.x#` 这类 hash variable 引用的值保留（不是密码本身）。
+- **敏感字段**：属性名像 password / passwd / secret / token / apiKey / privateKey / credential / authorization / username / smtpUser 的非空字符串。默认导出前会弹出「包含敏感字段」（默认关闭），不勾选时清空并把路径记在 `sensitive`；勾选后保留明文，`includeSensitive` 为 true。只是 `#envVariable.x#` 这类 hash variable 引用的值始终保留（不是密码本身）。
 
 ## 导入步骤（`pcopy-page.js` 的 `plan()` + `apply()`）
 1. **检查结构**（`shapeError()`）：`ProcessBuilder.getArray / setArray / updateProcessSelector`、`CustomBuilder.update`、`CustomBuilder.Builder.triggerChange`、`CustomBuilder.data.xpdl.Package`、三张表是对象、不是只读、有当前流程。任何一项对不上就停下，显示原因，什么都不写。

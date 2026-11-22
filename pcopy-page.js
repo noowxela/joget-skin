@@ -148,9 +148,23 @@
     }
     return paths;
   }
+  function listSensitivePaths(maps) {
+    const paths = [];
+    for (const m of MAPS) {
+      for (const [k, v] of Object.entries(maps[m] || {})) {
+        walk(v, m + "." + k, (o, key, p) => {
+          const val = o[key];
+          if (typeof val === "string" && val !== "" && !HASH_ONLY.test(val) && SENSITIVE.some((re) => re.test(key))) {
+            paths.push(p);
+          }
+        });
+      }
+    }
+    return paths;
+  }
 
   /* ---------- export ---------- */
-  function doExport() {
+  function doExport(opts) {
     const err = shapeError();
     if (err) {
       return { ok: false, error: err };
@@ -173,11 +187,13 @@
         }
       }
     }
+    const includeSensitive = !!(opts && opts.includeSensitive);
     const requires = collectRequires(maps);
-    const sensitive = blankSensitive(maps);
+    const sensitive = includeSensitive ? listSensitivePaths(maps) : blankSensitive(maps);
     const bundle = {
       kind: KIND,
       v: VERSION,
+      includeSensitive,
       source: {
         origin: location.origin,
         appId: CB.appId || "",
@@ -482,6 +498,7 @@
           activityForms: Object.keys(b.activityForms || {}).length,
           activityPlugins: Object.keys(b.activityPlugins || {}).length },
         missingForms, missingPlugins,
+        includeSensitive: !!b.includeSensitive,
         sensitive: Array.isArray(b.sensitive) ? b.sensitive : [],
         warnings,
         designIssues,
@@ -596,7 +613,7 @@
     }
     const run = async () => {
       if (m.cmd === "export") {
-        return doExport();
+        return doExport(m);
       }
       if (m.cmd === "check") {
         const r = await plan(m.text || "");

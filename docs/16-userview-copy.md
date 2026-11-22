@@ -1,9 +1,9 @@
-# 16. UI / Userview 复制（导出 / 导入）— `ucopy-content.js` + `ucopy-page.js`（v1.4.2）
+# 16. UI / Userview 复制（导出 / 导入）— `ucopy-content.js` + `ucopy-page.js`（v1.4.4）
 
 ## 做什么
 在 Userview Builder（UI 构建器）的工具栏（快捷键按钮右边）加两个按钮：
-- **⬇ 导出此 UI**：把当前打开的 Userview JSON，连同依赖清单，下载成 `<appId>_<版本>_<userviewId>.userview.json`。
-- **⬆ 导入 UI**：选一个这样的 JSON 文件，先检查、弹出确认框，按「导入」后在**当前 app 里创建一个新的 Userview**，并把导入的定义写进去，然后打开这个新 UI。
+- **⬇ 导出此 UI**：先弹出选项（「包含敏感字段」默认关闭），再把当前打开的 UI（Userview）JSON 连同依赖打包，下载成 `<appId>_<版本>_<userviewId>.userview.json`。
+- **⬆ 导入 UI**：选一个这样的 JSON 文件，先检查、弹出确认框（按类型列出缺失依赖的勾选清单），按「导入」后先创建勾选的缺失依赖，再在**当前 app 里创建一个新的 UI（Userview）**，把定义写进去，然后打开这个新 UI。已存在的依赖不会覆盖。
 
 **不会改写当前打开的那个 UI。** 导入会立刻把新 Userview 写到服务器：Joget 的 `builderSave` 只能更新已有 id（未知 id 返回 404），官方「新建 UI」本身也会立即落库，设计器里不存在「未保存的新 Userview」。若不想保留，请到 App Composer 删除这个新 Userview。
 
@@ -46,16 +46,35 @@
     "datalists": ["..."],
     "processes": ["..."],
     "activities": [{ "processId", "activityId" }],
-    "userviews": ["引用到的其他 Userview id"],
+    "userviews": ["来源应用里确实存在的其他 UI id"],
+    "danglingUserviews": [{ "id", "path", "className" }],
+    "sourceUserviewIds": ["导出时来源应用的 UI 列表"],
     "plugins": ["className"],
-    "envVariables": ["从 #envVariable.key# 扫到的 key"]
+    "envVariables": ["从 #envVariable.key# 扫到的 key"],
+    "i18nKeys": ["从 #i18n.key# 扫到的 key"],
+    "appResources": ["从 #appResource.file# 扫到的文件名"],
+    "themes": ["Theme Builder id，例如 theme_expenses"],
+    "permissionPlugins": ["权限插件 className"],
+    "serverBound": { "groups": [], "orgs": [], "departments": [], "roles": [] }
   },
+  "dependencies": {
+    "forms": [{ "id", "json" }],
+    "datalists": [{ "id", "json" }],
+    "themes": [{ "id", "name", "json" }],
+    "appResources": [{ "id", "fileName", "contentType", "base64" }],
+    "envVariables": [{ "id", "remarks", "value", "blanked" }],
+    "messages": [{ "id", "key", "value", "locale" }],
+    "userviews": [{ "id", "name", "json" }],
+    "failed": {}
+  },
+  "includeSensitive": false,
   "sensitive": ["userview.setting.properties.….password", "..."]
 }
 ```
-- `requires` 只是清单（表单、列表、流程定义都不会打进包里）。
-- 表单 = 属性里的 `formDefId` / `formId`；列表 = `listId` / `datalistId` / `datalistDefId`；流程 = `processId` / `processDefId`（去掉 `app#ver#` 前缀）；其他 Userview = `userviewId` / `userviewDefId`（排除自己）；插件 = 所有 `className`；环境变量 = 字符串里的 `#envVariable.x#`。
-- **敏感字段**：属性名像 password / passwd / secret / token / apiKey / privateKey / credential / authorization / username / smtpUser 的非空字符串，导出时清空，路径记在 `sensitive`。只是 `#envVariable.x#` 这类 hash variable 引用的值保留（不是密码本身）。规则与流程导出相同。
+- v 仍是 1；新增字段都是可选的，旧文件仍能导入（只是不会自动创建依赖）。
+- 表单 = 属性里的 `formDefId` / `formId`；列表 = `listId` / `datalistId` / `datalistDefId`；流程 = `processId` / `processDefId`（去掉 `app#ver#` 前缀）；插件 = 所有 `className`；环境变量 = `#envVariable.x#`；文案 = `#i18n.x#`；资源 = `#appResource.x#`；Theme Builder = `org.joget.plugin.enterprise.BuilderTheme.<themeId>`。
+- **其他 UI 引用**：只把 `userviewId` / `userviewDefId` 当成 UI 引用。会排除：自己（`setting.properties.userviewId` 以及与当前 UI 相同的 id），以及 `org.joget.plugin.enterprise.DashboardMenu` 上的 `userviewId`（这是 Dashboard 插件自己的设置，例如 `dashboard`，不是另一个 Userview）。若 id 在来源应用的 Userview 列表里不存在，记入 `danglingUserviews`（来源里也没有），不会当成可复制依赖，导入时也不会去创建。
+- **敏感字段**：属性名像 password / passwd / secret / token / apiKey / privateKey / credential / authorization / username / smtpUser 的非空字符串。默认导出时清空，路径记在 `sensitive`。勾选「包含敏感字段」时保留原值，`includeSensitive` 为 true。只是 `#envVariable.x#` 这类 hash variable 引用的值始终保留（不是密码本身）。规则与流程导出相同。环境变量的**值**也只在勾选后写入；否则包里是空值，导入时只创建空变量。
 
 ## 导入步骤（`ucopy-page.js` 的 `plan()` + `apply()`）
 1. **检查结构**（`shapeError()`）：当前是 Userview Builder（`CustomBuilder.builderType === "userview"`），有 `data.properties`、`getJson`、`appId` / `appVersion`。对不上就停下，什么都不写。
@@ -74,8 +93,9 @@
    - `/processActivity/options`，以及 `/web/json/workflow/process/list?all=true`
    - 插件：`GET /web/property/json/getElements?classname=org.joget.plugin.base.Plugin`，再加上 Userview 主题 / 菜单 / 权限的 getElements，以及当前 Builder 的 `CustomBuilder.paletteElements`。Userview JSON 里的结构类型（`Userview`、`UserviewCategory`、`UserviewPage` 等）和 `menu-component` 不列入“缺少的插件”。
    某张清单读不到时，确认框会说明「无法完成的检查」，而不是把所有引用都标成缺失。
-5. **确认框**列出：来源、当前打开的 UI（标明不会改写）、新 id / 名称、缺少的依赖、要重新填的敏感字段，以及「会写入服务器」的说明。
-6. **创建**：`POST /web/console/app/<app>/<ver>/userview/submit/create`（`id` / `name` / `description` / `builderMode=true`），CSRF 头用 `ConnectionManager.tokenName` / `tokenValue`。不传 `copyUserviewId`，避免先复制当前 UI 再覆盖。
+5. **确认框**列出：来源、当前打开的 UI（标明不会改写）、新 id / 名称；本地缺少且已打包的依赖带勾选框（默认勾选）；已存在的会标明跳过、不覆盖；「来源里也没有的 UI 引用」只展示不创建；流程以及权限里的用户组 / 组织 / 部门 / 角色只报告。勾选「导入」后先创建选中的依赖，再创建新 UI。
+   额外对照：`/cbuilder/theme/options`、`/resource/list` 或 `/resource/options`、各 locale 的 `/message/list`。
+6. **创建依赖**（仅勾选且目标中不存在的项）：表单 `POST .../form/submit?builderMode=true` 再 `.../form/builderSave/{id}`；列表 `.../datalist/submit/create` 再 `.../datalist/builderSave/{id}`；环境变量 `.../envVariable/submit/create`；文案 `.../message/submit`；资源 `.../resource/submit`（multipart `file`）；Theme Builder `.../cbuilder/theme/submit?builderMode=true` 再 `.../cbuilder/theme/save/{id}`。已存在的一律跳过。然后 **创建 UI**：`POST /web/console/app/<app>/<ver>/userview/submit/create`（`id` / `name` / `description` / `builderMode=true`），CSRF 头用 `ConnectionManager.tokenName` / `tokenValue`。不传 `copyUserviewId`，避免先复制当前 UI 再覆盖。
 7. **写入定义**：`POST /web/console/app/<app>/<ver>/userview/builderSave/<新id>`，body 是官方同款的 `jsonFile`（`FormData` + `JSON.stringify(...).replace(/\//g, '\\/')`）。失败则 `POST .../userview/delete`（`ids=<新id>`）回滚。
 8. **打开新 UI**：`CustomBuilder.ajaxRenderBuilder(.../userview/builder/<新id>)`（跟官方 `userviewSaved.jsp` 一样）。
 
@@ -94,10 +114,13 @@
 | 工具栏 `.advanced-tools-toogle` | 同 hotkeys.js（docs/11） |
 
 ## 已知行为 / 限制
-- 导入会在服务器上留下一个新 Userview。这是有意为之，不是自动「另存」当前打开的 UI。
-- 表单、列表、流程、插件、环境变量的**定义本身**不在包里，只扫描引用。本地缺了这些，新 UI 能创建，但对应菜单 / 页面会坏，需要先把依赖复制过来。
-- 敏感字段是按属性名猜的，可能多清（例如某个叫 `username` 的普通设置），导入后看确认框里的清单补回去。
-- `#envVariable.x#` 引用会保留，但环境变量的值不会跟着导出。
+- 导入会在服务器上留下一个新 UI（Userview）。这是有意为之，不是自动「另存」当前打开的 UI。依赖如果创建成功，也不会在 UI 回滚时自动删除。
+- 表单、列表、Theme Builder、App Resource、环境变量、i18n 文案会打进包并在导入时按勾选创建。已经存在的不会覆盖。
+- 流程定义（Run Process 等）目前只扫描并报告，不自动复制；请用流程复制。
+- 权限里引用的用户组 / 组织 / 部门 / 角色，以及本机没有安装的权限插件，只报告，不会创建。
+- Theme Builder 的 className 形如 `org.joget.plugin.enterprise.BuilderTheme.theme_expenses`。Userview Builder 打开时如果判定是 Theme Builder 主题，会用当前 app 的 Theme Builder 定义覆盖 `setting.properties.theme.properties`。所以只复制 userview JSON 不够，必须把 Theme Builder 和 `#appResource...#` 文件一并带到目标 app。
+- 敏感字段是按属性名猜的，可能多清（例如某个叫 `username` 的普通设置）。默认导出会清空；勾选「包含敏感字段」才会带明文。不要把带明文的文件发给不可信的人。
+- `#envVariable.x#` 引用会保留。未勾选「包含敏感字段」时，环境变量的值不会导出。
 - 跨 app 导入时，id 若在目标 app 里还没用过，会沿用原来的 id。
 - `CustomBuilder.data` 的结构没有公开文档；Joget 升级后先跑测试（结构对不上时导入会停下，不硬写）。
 
