@@ -11,6 +11,16 @@
               "strict_min_version": "142.0"
             }
           }
+        },
+        {
+          "version": "1.4.2",
+          "update_link": "https://github.com/noowxela/joget-skin/releases/download/v1.4.2/joget-skin-1.4.2.xpi",
+          "update_hash": "sha256:1263b527427a67c3caa119325924699a8067e859af0ed98a3f119b000b6d5a81",
+          "applications": {
+            "gecko": {
+              "strict_min_version": "142.0"
+            }
+          }
         }
       ]
     }
