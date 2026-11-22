@@ -39,6 +39,8 @@ Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Buil
 14. [单流程复制（导出 / 导入）](14-process-copy.md)
 15. [Firefox 自托管自动更新](15-auto-update.md)
 
+更新日志（用户可见变更，按版本排列）在仓库根目录的 [CHANGELOG.md](../CHANGELOG.md)，发布后显示在 [GitHub Pages](https://noowxela.github.io/joget-skin/)。
+
 ## 通用排查步骤
 1. DevTools → Elements：`<html>` 上有没有 `joget-skin`。没有 → 看 [01](01-content-js.md)。
 2. Console 过滤 `joget-skin` / `Joget Skin`：保存提示音会打 `console.debug("[joget-skin] chime: …")`，App Composer 让位时打 `console.warn("[Joget Skin] another copy …")`。

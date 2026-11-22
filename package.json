@@ -4,7 +4,7 @@
   "private": true,
   "description": "Firefox extension: declutter + layout tweaks for Joget DX 9 (local use).",
   "scripts": {
-    "lint": "npx --yes web-ext lint --self-hosted --source-dir . --ignore-files \"screenshots/**\" \"themes/v1.1-indigo/**\" \"*.zip\" \"node_modules/**\" \"sign.sh\" \"release.sh\" \"scripts/**\" \"docs/**\" \"tests/**\" \"package.json\" \".env.example\" \"README.md\"",
+    "lint": "npx --yes web-ext lint --self-hosted --source-dir . --ignore-files \"screenshots/**\" \"themes/v1.1-indigo/**\" \"*.zip\" \"node_modules/**\" \"sign.sh\" \"release.sh\" \"scripts/**\" \"docs/**\" \"tests/**\" \"package.json\" \".env.example\" \"README.md\" \"CHANGELOG.md\"",
     "sign": "bash ./sign.sh"
   }
 }

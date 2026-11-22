@@ -4,6 +4,7 @@
 
 - Firefox 142+，gecko id `joget-skin@alexwoon`
 - 不在 AMO 公开目录上架。签名包以 unlisted 方式分发，用 Firefox 自托管更新（见 [docs/15-auto-update.md](docs/15-auto-update.md)）
+- 安装说明和更新日志：<https://noowxela.github.io/joget-skin/>（原文 [CHANGELOG.md](CHANGELOG.md)）
 
 ## 安装
 
@@ -20,6 +21,7 @@
 ```bash
 npm run -s lint
 node tests/updates-json.test.mjs          # 更新清单生成器，不需要 Joget
+node tests/pages.test.mjs                 # GitHub Pages / 更新日志生成器，不需要 Joget
 node tests/run.mjs <关键词>               # 针对本机 Joget 的功能测试，见 tests/README.md
 ./release.sh --dry-run                    # 演练发版，不访问 AMO / GitHub
 ```

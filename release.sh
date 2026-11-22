@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Cut a signed, self-hosted Firefox release of Joget Skin and publish
-# updates.json to GitHub Pages. See docs/15-auto-update.md.
+# updates.json plus the changelog page to GitHub Pages. See docs/15-auto-update.md.
 #
 # Usage:
 #   ./release.sh                 # current version if not yet tagged, otherwise bump patch
@@ -8,9 +8,13 @@
 #   ./release.sh --dry-run
 #   ./release.sh --dry-run 1.4.2
 #
+# CHANGELOG.md must already have a "## <version> — YYYY-MM-DD" entry for the
+# version being released, or the script exits before bumping or signing.
+#
 # --dry-run does the local steps (version bump, commit, tag, generate
-# updates.json from a placeholder xpi) and skips anything that talks to the
-# network: AMO (sign.sh), gh release, git push, and the Pages publish push.
+# updates.json and the Pages HTML from a placeholder xpi) and skips anything
+# that talks to the network: AMO (sign.sh), gh release, git push, and the
+# Pages publish push.
 set -euo pipefail
 
 OWNER="noowxela"
@@ -120,6 +124,10 @@ set_versions() {
   '
 }
 
+# Fail early if the changelog has no heading for this version (before any commit/tag).
+[ -f CHANGELOG.md ] || die "CHANGELOG.md is missing; add a ## $TARGET entry before releasing."
+node scripts/gen-pages.mjs --changelog CHANGELOG.md --require-version "$TARGET" --check-only
+
 if [ "$current" != "$TARGET" ]; then
   set_versions "$TARGET"
   git add -- manifest.json package.json
@@ -205,12 +213,18 @@ fi
 log "generated updates.json:"
 cat "$WORKDIR/updates.json"
 
+mkdir -p "$WORKDIR/site"
+node scripts/gen-pages.mjs   --changelog CHANGELOG.md   --output-dir "$WORKDIR/site"   --latest-version "$TARGET"   --require-version "$TARGET"   --xpi-url "$XPI_LINK"
+log "generated Pages HTML for v$TARGET"
+
 if [ "$DRY_RUN" -eq 1 ]; then
   mkdir -p web-ext-artifacts
   cp "$WORKDIR/updates.json" web-ext-artifacts/updates.dry-run.json
-  log "dry-run: wrote web-ext-artifacts/updates.dry-run.json"
+  cp "$WORKDIR/site/index.html" web-ext-artifacts/index.dry-run.html
+  cp "$WORKDIR/site/changelog.html" web-ext-artifacts/changelog.dry-run.html
+  log "dry-run: wrote web-ext-artifacts/updates.dry-run.json, index.dry-run.html, changelog.dry-run.html"
   log "dry-run: would create GitHub release v$TARGET with $XPI_NAME"
-  log "dry-run: would publish updates.json to $REMOTE $PAGES_BRANCH ($UPDATE_PATH)"
+  log "dry-run: would publish updates.json and the changelog page to $REMOTE $PAGES_BRANCH"
   log "dry-run: would git push $REMOTE HEAD and tag v$TARGET"
   log "dry-run complete for v$TARGET"
   exit 0
@@ -247,19 +261,14 @@ else
 fi
 
 cp "$WORKDIR/updates.json" "$PAGES_DIR/$UPDATE_PATH"
-# Minimal index so the Pages root is not a 404. Do not copy docs/ or source.
-cat > "$PAGES_DIR/index.html" <<EOF
-<!DOCTYPE html>
-<meta charset="utf-8">
-<title>Joget Skin updates</title>
-<p>Firefox update manifest: <a href="./updates.json">updates.json</a></p>
-EOF
+cp "$WORKDIR/site/index.html" "$PAGES_DIR/index.html"
+cp "$WORKDIR/site/changelog.html" "$PAGES_DIR/changelog.html"
 
-git -C "$PAGES_DIR" add -- "$UPDATE_PATH" index.html
+git -C "$PAGES_DIR" add -- "$UPDATE_PATH" index.html changelog.html
 if git -C "$PAGES_DIR" diff --cached --quiet; then
   log "gh-pages already up to date"
 else
-  git -C "$PAGES_DIR" commit -m "updates.json for v$TARGET"
+  git -C "$PAGES_DIR" commit -m "pages for v$TARGET"
   git -C "$PAGES_DIR" push "$REMOTE" "$PAGES_BRANCH"
 fi
 
@@ -277,6 +286,7 @@ if ! gh api "repos/${OWNER}/${NAME}/pages" >/dev/null 2>&1; then
   fi
 fi
 
-log "published https://${OWNER}.github.io/${NAME}/updates.json"
+log "published https://${OWNER}.github.io/${NAME}/"
+log "updates https://${OWNER}.github.io/${NAME}/updates.json"
 log "release https://github.com/${OWNER}/${NAME}/releases/tag/v${TARGET}"
 log "done v$TARGET"

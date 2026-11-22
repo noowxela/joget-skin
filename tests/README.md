@@ -24,7 +24,7 @@ SHOTS=../joget-skin-shots node tests/run.mjs   # 顺便截图（失败时也会�
 
 需要：Node 18+、Playwright 带 Chromium、Joget 在跑并有 crm 演示 app（有 `crm_account` 表单）。
 
-不需要 Joget 的单元测试：`node tests/updates-json.test.mjs`（自动更新清单生成器，见 docs/15）。
+不需要 Joget 的单元测试：`node tests/updates-json.test.mjs`（自动更新清单生成器，见 docs/15）、`node tests/pages.test.mjs`（GitHub Pages / 更新日志页面生成器）。
 
 ## 测试和功能对照
 | 测试 | 功能文档 |
@@ -44,6 +44,7 @@ SHOTS=../joget-skin-shots node tests/run.mjs   # 顺便截图（失败时也会�
 | property editor: label left / input right、list builder rows | docs/13 |
 | process copy: …（3 个：导出、同 app 导入并对比 Clone、警告框 / 取消 / 错误文件） | docs/14 |
 | `node tests/updates-json.test.mjs`（无需 Joget） | docs/15 |
+| `node tests/pages.test.mjs`（无需 Joget） | CHANGELOG.md、docs/15 |
 | skin off: everything from v1.3.7 goes away | 全部 |
 
 ## 不在测试范围

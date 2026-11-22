@@ -8,10 +8,11 @@
 
 | 用途 | URL |
 |---|---|
+| 安装说明和更新日志（给人看的页面） | `https://noowxela.github.io/joget-skin/`（另有 `changelog.html`） |
 | Firefox 去查的更新清单（`update_url`） | `https://noowxela.github.io/joget-skin/updates.json` |
 | 某个版本的签名 xpi（`update_link`） | `https://github.com/noowxela/joget-skin/releases/download/v<ver>/joget-skin-<ver>.xpi` |
 
-`updates.json` 放在 `gh-pages` 分支的根目录，只放这一份清单和一页很短的 `index.html`，不会把 `docs/` 或源码发布到 Pages。选 Pages 而不是 `raw.githubusercontent.com` 或 Release 资产来托管清单，是因为这个 URL 稳定、只含更新文件、GitHub Pages 会用 HTTPS 并给出合适的 `Content-Type`。
+`updates.json` 放在 `gh-pages` 分支的根目录，和给人看的 `index.html` / `changelog.html` 放在一起，不会把 `docs/` 或源码发布到 Pages。选 Pages 而不是 `raw.githubusercontent.com` 或 Release 资产来托管清单，是因为这个 URL 稳定、GitHub Pages 会用 HTTPS 并给出合适的 `Content-Type`。发版脚本只会追加或替换当前版本的清单条目，不会改写已发布版本的 `update_hash`。
 
 xpi 放在 GitHub Release 资产里，而不是 Pages 上，免得二进制包和更新清单混在一起。GitHub 的 `/releases/download/...` 会 302 到 `release-assets.githubusercontent.com`（或同类的 `*.githubusercontent.com`）上的 HTTPS 地址。Extension Workshop 的[更新文档](https://extensionworkshop.com/documentation/manage/updating-your-extension/)要求清单本身必须是 HTTPS，并且 `update_link` 必须是 HTTPS（否则就要带 `update_hash`）。文档没有单独写「跟不跟跳转」，但 Firefox 的更新下载会跟随 HTTPS→HTTPS 的跳转；Mozilla 工作人员也说过可以用 GitHub Releases 当 `update_link`。每一条更新都会带 `update_hash`（`sha256:`），文件在跳转之后仍会按哈希校验。
 
@@ -33,7 +34,7 @@ xpi 放在 GitHub Release 资产里，而不是 Pages 上，免得二进制包�
 ./release.sh --dry-run  # 只做本地步骤，不访问 AMO / GitHub / git push
 ```
 
-脚本会：确认工作区干净（忽略未跟踪的 `.amo-upload-uuid` 和 `AGENTS.md`）→ 必要时改 `manifest.json` / `package.json` 的版本并提交 → 打 `v<ver>` 标签 → 跑 `sign.sh` 向 AMO 申请 unlisted 签名 → 把签好的 xpi 复制为 `joget-skin-<ver>.xpi` → `gh release create` → 用 `scripts/gen-updates-json.mjs` 把这一版（含 sha256）合并进已有的 `updates.json`（保留历史版本）→ 推到 `gh-pages` → push 提交和标签。
+脚本会：确认工作区干净（忽略未跟踪的 `.amo-upload-uuid` 和 `AGENTS.md`）→ 确认 `CHANGELOG.md` 已有这一版的标题（没有就失败，不会改版本或签名）→ 必要时改 `manifest.json` / `package.json` 的版本并提交 → 打 `v<ver>` 标签 → 跑 `sign.sh` 向 AMO 申请 unlisted 签名 → 把签好的 xpi 复制为 `joget-skin-<ver>.xpi` → `gh release create` → 用 `scripts/gen-updates-json.mjs` 把这一版（含 sha256）合并进已有的 `updates.json`（保留历史版本）→ 用 `scripts/gen-pages.mjs` 生成安装说明和更新日志页面 → 推到 `gh-pages`（不改清单里已有版本的哈希，只追加当前版本）→ push 提交和标签。
 
 装扩展：
 
@@ -53,6 +54,8 @@ xpi 放在 GitHub Release 资产里，而不是 Pages 上，免得二进制包�
 | `scripts/gen-updates-json.mjs` | 无依赖，按 xpi 算 sha256，合并进 `updates.json` |
 | `tests/updates-json.test.mjs` | 生成器的单元测试（不需要 Joget） |
 | `release.sh` | 一键发版；`--dry-run` 跳过所有网络步骤 |
+| `CHANGELOG.md` | 用户可见更新日志。发版前必须已有对应 `## <版本> — YYYY-MM-DD` 标题 |
+| `scripts/gen-pages.mjs` | 把 CHANGELOG.md 生成 GitHub Pages 的 `index.html` / `changelog.html`，不改 `updates.json` |
 | `sign.sh` | 用本机 `.env` 里的 AMO 凭证做 unlisted 签名；产物在 `web-ext-artifacts/`。脚本本身不会打印凭证 |
 
 ## 依赖
