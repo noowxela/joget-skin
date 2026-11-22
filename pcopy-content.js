@@ -11,7 +11,9 @@
  *   marker, accepted only from this window and this origin.
  * - Export downloads <appId>_<ver>_<processId>.process.json.
  * - Import: pick a file -> page checks it (no writes) -> dialog lists the new id, renames, missing
- *   forms / plugins, fields to re-enter and warnings -> "导入" appends the process. Never saves.
+ *   forms / plugins, fields to re-enter, warnings, and any package-wide design issues
+ *   (Joget Save validates every process, not just the imported one) -> "导入" appends the process. Never saves.
+ *   If Save is blocked with "Design is invalid", a dialog lists each process/node and why.
  * - Active only while <html> has class "joget-skin".
  */
 (function () {
@@ -74,7 +76,15 @@
     } catch (err) {
       return;
     }
-    if (!m || m.source !== OUT || !pending.has(m.id)) {
+    if (!m || m.source !== OUT) {
+      return;
+    }
+    if (m.cmd === "design-invalid" || m.id === "design-invalid") {
+      showDesignIssues("无法保存：Design is invalid", m.issues || [], m.lines,
+        "Joget 保存时会检查这个 app 里的全部流程，不只是当前打开的这个。请先修好或删掉有问题的流程，再按 Save。");
+      return;
+    }
+    if (!pending.has(m.id)) {
       return;
     }
     const done = pending.get(m.id);
@@ -206,7 +216,32 @@
     section(body, "导出时清空的敏感字段，导入后请重新填写", p.sensitive, "warn");
     section(body, "提醒", p.warnings, "warn");
     section(body, "会加到本地的 Application", (p.addApps || []).map((a) => a["-Id"]));
+    section(body, "按 Save 会被拒绝：设计无效（Joget 会检查这个 app 里的全部流程）",
+      p.designIssueLines || (p.designIssues || []).map(formatIssueLine), "danger");
     body.append(el("p", "jskin-pcopy-note", "导入只改设计器里的数据，不会自动保存。检查无误后请自己按 Save；不想要就刷新页面放弃。"));
+  }
+
+  function formatIssueLine(i) {
+    if (typeof i === "string") {
+      return i;
+    }
+    const proc = "流程 " + i.processId + (i.processName ? "「" + i.processName + "」" : "");
+    if (i.activityId) {
+      return proc + " · 节点 " + i.activityId + (i.activityName ? "「" + i.activityName + "」" : "") + "：" + i.reason;
+    }
+    return proc + "：" + i.reason;
+  }
+  function showDesignIssues(title, issues, lines, note) {
+    const items = (lines && lines.length) ? lines : (issues || []).map(formatIssueLine);
+    if (!items.length) {
+      return;
+    }
+    openDialog(title, (body) => {
+      section(body, "具体原因", items, "danger");
+      if (note) {
+        body.append(el("p", "jskin-pcopy-note", note));
+      }
+    }, [["关闭", "btn-secondary", closeDialog]]);
   }
 
   /* ---------- actions ---------- */
@@ -280,7 +315,14 @@
             showError("导入流程", a.error);
             return;
           }
-          toast("已导入为 " + a.plan.newId + "，检查后请按 Save 保存");
+          const issues = (a.plan && a.plan.designIssues) || [];
+          const lines = (a.plan && a.plan.designIssueLines) || issues.map(formatIssueLine);
+          if (issues.length) {
+            showDesignIssues("已导入为 " + a.plan.newId + "，但保存会被拒绝", issues, lines,
+              "导入本身成功了，但 Joget 保存时会检查这个 app 里的全部流程。请先修好或删掉下面这些流程，再按 Save。");
+          } else {
+            toast("已导入为 " + a.plan.newId + "，检查后请按 Save 保存");
+          }
         }],
       ]);
     } catch (e) {

@@ -80,12 +80,31 @@
 - `CustomBuilder.data` 的结构没有公开文档；Joget 升级后先跑测试（结构对不上时导入会停下，不硬写）。
 
 ## 测试
-`node tests/run.mjs "process copy"`（3 个）：
+`node tests/run.mjs "process copy"`（4 个）：
 1. 按钮只在 Process Builder、在快捷键按钮后面；导出的包和设计器数据逐项一致（去前缀）；假的 username/password 被清空、`#envVariable.x#` 保留；导出不改设计器数据；Form Builder 上没有按钮。
-2. 导入到同一个 app → `process1_2`、“(Copy)”；表单 / 插件绑定 1:1 改 key；原有流程（除布局外）和原有绑定不变；没有自动保存；并在另一个页面跑 Joget 自带的 `cloneProcess`，对比：原流程完全一致、新流程（除布局外）一致、参与者 id 和三张表的 key 一致、表单和参与者绑定一致。
+2. 导入到同一个 app → `process1_2`、“(Copy)”；表单 / 插件绑定 1:1 改 key；原有流程（除布局外）和原有绑定不变；没有自动保存；并在另一个页面跑 Joget 自带的 `cloneProcess`，对比：原流程完全一致、新流程（除布局外）一致、参与者 id 和三张表的 key 一致、表单和参与者绑定一致。有效的 app 不会出现「设计无效」提示。
 3. 模拟别的 app 的包（缺表单、缺插件、子流程、敏感字段、参与者改名）→ 确认框都列出来；取消不改数据；错误文件只显示错误、不改数据；皮肤关掉按钮消失。
+4. 在内存里先 `addProcess()` 造一个空流程（和新建 app 打开 Process Builder 时自动生成的 stub 一样）→ 导入确认框列出「按 Save 会被拒绝」及空流程 id；导入后弹出同样的说明；点 Save（请求不会发出）会出现「无法保存：Design is invalid」对话框，点名那个空流程。关页面即丢掉，不写服务器。
 
-测试不点 Save。真实保存在 v1.4.0 开发时手动验证过：新建临时 app（复制自 crm）→ 从 crm 导出 process1 → 导入 → Save 成功 → 重新打开后 `process1_2`、参与者和三张表都在 → 删除临时 app。
+测试不真正提交 Save。真实保存在 v1.4.0 开发时手动验证过：新建临时 app（复制自 crm）→ 从 crm 导出 process1 → 导入 → Save 成功 → 重新打开后 `process1_2`、参与者和三张表都在 → 删除临时 app。
+
+## 「Design is invalid」
+
+Joget 点 Save 时会跑 `ProcessBuilder.beforeSaveValidation` → `ProcessBuilder.validate()`（`pbuilder.js` 6439–6610）。它检查 **这个 app 里的全部流程**，不只是当前打开的那个。任意一个不合格，toast 就只显示「Design is invalid」，保存请求不会发出。画布上的红色 `invalidNodeMessage` 也只画在当前流程的节点上；空流程没有节点，所以看起来像「导入的流程有问题，但不知道错在哪」。
+
+检查项（和 Joget 一致）：
+- 流程至少有一个活动节点；必须恰好有一个开始节点（`JaWE_GRAPH_START_OF_WORKFLOW`）
+- 每个活动要么有进入连线、要么是开始节点；要么有出去连线、要么是结束节点
+- 开始节点后面的节点不能再有其他进入连线；Deadline 必须有对应的 EXCEPTION 连线
+
+最常见情况：在 **空白 app**（或点了「新建流程」）打开 Process Builder 时，Joget 会自动建一个没有活动的 `process1`「Process 1」。再导入一份本来完全合法的流程（例如 `expenseclaim` 的 `process1`，会变成 `process1_2`），当前画布是合法的导入结果，但包里那个空的 `process1` 仍在，Save 就会失败。
+
+处理：在流程下拉菜单里选中那个空流程，点删除，再保存。缺表单不会触发这句英文，但会让 Joget 在保存时用别的错误拒绝，仍需先把表单复制过来。
+
+扩展会：
+- 在导入确认框里预先列出这些问题（标题「按 Save 会被拒绝：设计无效」）
+- 导入完成后如果包仍不合格，再弹一次说明
+- 拦截 `ProcessBuilder.beforeSaveValidation`，失败时弹出「无法保存：Design is invalid」，列出每个流程 / 节点和原因
 
 ## 排查
 - 按钮没出现：`<html>` 有没有 `joget-skin`；路径是不是 `.../process/builder`；工具栏里有没有 `.advanced-tools-toogle`。

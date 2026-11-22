@@ -202,6 +202,146 @@
     return { ok: true, bundle, fileName };
   }
 
+
+  /* ---------- design validation (same rules as ProcessBuilder.validate, pbuilder.js:6462-6610) ---------- */
+  function cmsg(k, fallback) {
+    return (typeof window.get_cbuilder_msg === "function" && window.get_cbuilder_msg(k)) || fallback || k;
+  }
+  function connectingActivityId(val) {
+    const s = String(val || "");
+    const m = s.match(/CONNECTING_ACTIVITY_ID=([^,]*),/);
+    return m ? m[1] : "";
+  }
+  function formatIssue(i) {
+    const proc = "流程 " + i.processId + (i.processName ? "「" + i.processName + "」" : "");
+    if (i.activityId) {
+      return proc + " · 节点 " + i.activityId + (i.activityName ? "「" + i.activityName + "」" : "") + "：" + i.reason;
+    }
+    return proc + "：" + i.reason;
+  }
+  // pkg is Package; omit to read the live designer data. Never writes.
+  function collectDesignIssues(pkg) {
+    const PB = window.ProcessBuilder, CB = window.CustomBuilder;
+    if (!PB || !CB || !CB.data || !CB.data.xpdl) {
+      return [];
+    }
+    pkg = pkg || CB.data.xpdl.Package;
+    const issues = [];
+    const procs = arr(pkg.WorkflowProcesses, "WorkflowProcess");
+    for (const proc of procs) {
+      const pid = proc["-Id"];
+      const pname = proc["-Name"] || pid;
+      const acts = activities(proc);
+      const trans = arr(proc.Transitions, "Transition");
+      const pa = attrs(proc);
+      const starts = [], ends = [];
+      const startMeta = [];
+      for (const a of pa) {
+        if (a["-Name"] === "JaWE_GRAPH_END_OF_WORKFLOW" || a["-Name"] === "JaWE_GRAPH_START_OF_WORKFLOW") {
+          // same extract as ProcessBuilder.validate (empty CONNECTING_ACTIVITY_ID leaves the whole string)
+          const actId = String(a["-Value"] || "").replace(/.*,CONNECTING_ACTIVITY_ID=([^,]+),.*/g, "$1");
+          const connected = connectingActivityId(a["-Value"]);
+          if (a["-Name"] === "JaWE_GRAPH_START_OF_WORKFLOW") {
+            starts.push(actId);
+            startMeta.push({ actId, connected });
+          } else {
+            ends.push(actId);
+          }
+        }
+      }
+      const fromT = {}, toT = {};
+      for (const t of trans) {
+        (fromT[t["-From"]] ||= []).push(t);
+        (toT[t["-To"]] ||= []).push(t);
+      }
+      const push = (activityId, activityName, reason, kind) => {
+        issues.push({ processId: pid, processName: pname, activityId: activityId || "", activityName: activityName || "", reason, kind });
+      };
+      if (!acts.length) {
+        push("", "", "没有任何活动节点（空流程）", "empty");
+      }
+      if (starts.length === 0) {
+        push("", "", "没有开始节点（Start）", "noStart");
+      }
+      if (starts.length > 1) {
+        push(starts.join(","), "", "有多个开始节点：" + starts.join("、"), "multiStart");
+      }
+      for (const s of startMeta) {
+        if (!s.connected) {
+          push("", "", "开始节点没有连接到活动", "emptyStart");
+        }
+      }
+      for (const act of acts) {
+        const aid = act["-Id"];
+        const aname = act["-Name"] || "";
+        const activityInvalid = (fromT[aid] === undefined && ends.indexOf(aid) === -1)
+          || (toT[aid] === undefined && starts.indexOf(aid) === -1);
+        const startInvalid = starts.indexOf(aid) !== -1 && toT[aid] && toT[aid].length > 0;
+        let deadlineInvalid = false;
+        const deadlines = arr(act.Deadline);
+        if (deadlines.length) {
+          if (fromT[aid] === undefined) {
+            deadlineInvalid = true;
+          } else {
+            const exceptionNames = [];
+            for (const t of fromT[aid]) {
+              if (t.Condition && t.Condition["-Type"] === "EXCEPTION") {
+                exceptionNames.push(t.Condition["#text"]);
+              }
+            }
+            for (const d of deadlines) {
+              if (exceptionNames.indexOf(d.ExceptionName) === -1) {
+                deadlineInvalid = true;
+                break;
+              }
+            }
+          }
+        }
+        if (activityInvalid || deadlineInvalid || startInvalid) {
+          const reasons = [];
+          if (activityInvalid) {
+            reasons.push(cmsg("pbuilder.label.missingTransition", "缺少连线或开始/结束节点"));
+          }
+          if (deadlineInvalid) {
+            reasons.push(cmsg("pbuilder.label.unhandleDeadline", "有未处理的 Deadline"));
+          }
+          if (startInvalid) {
+            reasons.push(cmsg("pbuilder.label.invalidStart", "开始节点后面的节点不能再有其他进入连线"));
+          }
+          push(aid, aname, reasons.join("；"), "node");
+        }
+      }
+    }
+    return issues;
+  }
+  function hookSaveValidation() {
+    const PB = window.ProcessBuilder;
+    if (!PB || typeof PB.beforeSaveValidation !== "function" || PB.__jskinValidateHook) {
+      return !!(PB && typeof PB.beforeSaveValidation === "function");
+    }
+    PB.__jskinValidateHook = true;
+    const orig = PB.beforeSaveValidation.bind(PB);
+    PB.beforeSaveValidation = function () {
+      const ok = orig();
+      if (!ok) {
+        const issues = collectDesignIssues();
+        if (issues.length) {
+          window.postMessage(JSON.stringify({
+            source: OUT, id: "design-invalid", cmd: "design-invalid", ok: false,
+            issues, lines: issues.map(formatIssue),
+          }), location.origin);
+        }
+      }
+      return ok;
+    };
+    return true;
+  }
+  (function waitHook(n) {
+    if (!hookSaveValidation() && n < 80) {
+      setTimeout(() => waitHook(n + 1), 250);
+    }
+  })(0);
+
   /* ---------- import: check + plan (no writes) ---------- */
   let pluginCache = null;
   async function localPlugins() {
@@ -322,6 +462,14 @@
       warnings.push("导出时远端设计器里有未保存的修改，文件里的是当时屏幕上的版本。");
     }
 
+    // preview what ProcessBuilder.validate would say after this import (does not write)
+    const pkgPreview = clone(pkg);
+    const previewProc = retarget(clone(b.process), srcId, newId, newName, pmap);
+    const previewList = arr(pkgPreview.WorkflowProcesses, "WorkflowProcess");
+    previewList.push(previewProc);
+    PB.setArray(pkgPreview, "WorkflowProcesses", "WorkflowProcess", previewList);
+    const designIssues = collectDesignIssues(pkgPreview);
+
     return {
       ok: true,
       bundle: b,
@@ -336,6 +484,8 @@
         missingForms, missingPlugins,
         sensitive: Array.isArray(b.sensitive) ? b.sensitive : [],
         warnings,
+        designIssues,
+        designIssueLines: designIssues.map(formatIssue),
       },
     };
   }
@@ -423,6 +573,9 @@
     PB.updateProcessSelector();
     CB.Builder.triggerChange();
     window.location.hash = p.newId;
+    const designIssues = collectDesignIssues();
+    p.designIssues = designIssues;
+    p.designIssueLines = designIssues.map(formatIssue);
     return { ok: true, plan: p };
   }
 
@@ -454,6 +607,10 @@
       }
       if (m.cmd === "ping") {
         return { ok: true };
+      }
+      if (m.cmd === "validate") {
+        const issues = collectDesignIssues();
+        return { ok: true, officialValid: window.ProcessBuilder.validate(), issues, lines: issues.map(formatIssue) };
       }
       return { ok: false, error: "unknown cmd " + m.cmd };
     };

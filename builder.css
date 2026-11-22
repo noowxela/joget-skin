@@ -701,6 +701,10 @@ html.joget-skin #jskin-ucopy-dialog .jskin-ucopy-section.warn {
   background: #fff7ed;
   border-left: 3px solid #f59e0b;
 }
+html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-section.danger {
+  background: #fef2f2;
+  border-left: 3px solid #dc2626;
+}
 html.joget-skin #jskin-pcopy-dialog .jskin-pcopy-h,
 html.joget-skin #jskin-ucopy-dialog .jskin-ucopy-h {
   font-weight: 600;

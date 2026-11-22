@@ -741,6 +741,7 @@ test("process copy: import into the same app -> _2 id like Clone, mappings re-ke
   await chooseImport(page, file);
   const txt = await page.textContent("#jskin-pcopy-dialog");
   assert(txt.includes(pid + "_2"), "dialog has no new id: " + txt.slice(0, 300));
+  assert(!/没有任何活动节点|按 Save 会被拒绝/.test(txt), "false design-invalid warning on a valid package: " + txt.slice(0, 400));
   await page.click("#jskin-pcopy-dialog .btn-primary");
   const nid = pid + "_2";
   await page.waitForFunction((n) => location.hash === "#" + n && ProcessBuilder.currentProcessData && ProcessBuilder.currentProcessData.properties.id === n, nid, { timeout: 15000 });
@@ -828,6 +829,53 @@ test("process copy: warnings dialog (missing form/plugin, renames, re-enter fiel
   return `warnings listed (missing form + plugin, re-enter field, subflow, participant renames to jskin_remote_proc_*); cancel / bad file → no change; skin off → buttons removed (${pid})`;
 });
 
+test("process copy: leftover empty process listed as design issues; Save dialog names it", async (page) => {
+  await openProcessBuilder(page);
+  const { file, bundle } = await exportBundle(page);
+  const beforeId = await page.evaluate(() => ProcessBuilder.currentProcessData.properties.id);
+  // in-memory only: Joget's "add process" creates a stub with no activities (the same stub a new app starts with)
+  const emptyId = await page.evaluate(() => ProcessBuilder.addEmptyProcess()["-Id"]);
+  await page.evaluate((id) => {
+    ProcessBuilder.updateProcessSelector();
+    CustomBuilder.Builder.triggerChange();
+    window.location.hash = id;
+  }, emptyId);
+  await page.waitForFunction((id) => ProcessBuilder.currentProcessData && ProcessBuilder.currentProcessData.properties.id === id, emptyId, { timeout: 15000 });
+  await page.waitForTimeout(500);
+  assert(emptyId && emptyId !== beforeId, "addEmptyProcess did not create a new id: " + emptyId + " (was " + beforeId + ")");
+  const pre = await page.evaluate(async () => {
+    // ping validate through the page script after it is already injected
+    return true;
+  });
+  await chooseImport(page, file);
+  const txt = await page.textContent("#jskin-pcopy-dialog");
+  await page.mouse.move(5, 890);
+  await page.evaluate(() => document.querySelectorAll(".jskin-pcopy-toast").forEach((t) => t.remove()));
+  await shot(page, "pcopy-design-issues-dialog", "#jskin-pcopy-dialog .jskin-pcopy-box");
+  assert(/按 Save 会被拒绝/.test(txt), "import dialog missing design-invalid section: " + txt.slice(0, 500));
+  assert(txt.includes(emptyId) && /没有任何活动节点/.test(txt), "dialog did not name the empty process: " + txt.slice(0, 500));
+  assert(!txt.includes("无法读取"), "unexpected read errors in dialog");
+  await page.click("#jskin-pcopy-dialog .btn-primary");
+  await page.waitForFunction((n) => location.hash === "#" + n, bundle.process["-Id"] === beforeId ? beforeId + "_2" : bundle.process["-Id"], { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(800);
+  // after import, leftover empty process still makes the package invalid — dialog should stay/reopen
+  const afterImportDlg = await page.textContent("#jskin-pcopy-dialog").catch(() => "");
+  assert(afterImportDlg && /但保存会被拒绝/.test(afterImportDlg) && afterImportDlg.includes(emptyId),
+    "post-import dialog missing details: " + String(afterImportDlg).slice(0, 400));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  // click Save: Joget blocks it; our hook must list the same process
+  await page.click("#save-btn, #save-btn-toolbar");
+  await page.waitForSelector("#jskin-pcopy-dialog", { timeout: 8000 });
+  const saveTxt = await page.textContent("#jskin-pcopy-dialog");
+  await shot(page, "pcopy-save-invalid-details", "#jskin-pcopy-dialog .jskin-pcopy-box");
+  assert(/无法保存：Design is invalid/.test(saveTxt), "save dialog title missing: " + saveTxt.slice(0, 400));
+  assert(saveTxt.includes(emptyId) && /没有任何活动节点/.test(saveTxt), "save dialog did not name the empty process: " + saveTxt.slice(0, 400));
+  const saved = await page.evaluate(() => CustomBuilder.isSaved());
+  assert(saved === false, "Save should have been blocked");
+  await page.keyboard.press("Escape");
+  return `empty ${emptyId} listed in import dialog and in the Save "Design is invalid" dialog; Save blocked (unsaved)`;
+});
 
 /* ---------- v1.4.2 userview / UI copy ---------- */
 
