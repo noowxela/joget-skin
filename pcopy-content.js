@@ -332,6 +332,22 @@
     }
   }
 
+  function placeGroup(group, after) {
+    const menu = document.getElementById("jskin-tool-menu");
+    if (menu) {
+      if (group.parentElement !== menu) {
+        menu.append(group);
+      }
+      if (typeof window.__jskinToolMenuAdopt === "function") {
+        window.__jskinToolMenuAdopt();
+      }
+      return;
+    }
+    if (after && group.previousElementSibling !== after) {
+      after.after(group);
+    }
+  }
+
   /* ---------- toolbar button ---------- */
   function ensureButton() {
     const existing = document.getElementById(GROUP_ID);
@@ -350,9 +366,7 @@
     // after the hotkeys button (which itself follows Advanced Tools / the show-others button)
     const after = document.getElementById(HOTKEYS_GROUP_ID) || document.getElementById(OTHERS_GROUP_ID) || anchor;
     if (existing) {
-      if (existing.previousElementSibling !== after) {
-        after.after(existing);
-      }
+      placeGroup(existing, after);
       return;
     }
     const group = el("div", "btn-group toolbar-group me-3");
@@ -374,7 +388,7 @@
       mk(EXPORT_ID, "⬇ 导出此流程", "把当前打开的流程（含参与者 / 表单 / 插件绑定）下载成 JSON", doExport),
       mk(IMPORT_ID, "⬆ 导入流程", "从 JSON 文件导入一个流程到这个 app（不会自动保存）", doImport),
     );
-    after.after(group);
+    placeGroup(group, after);
   }
 
   function run() {

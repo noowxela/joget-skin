@@ -47,6 +47,7 @@ SHOTS=../joget-skin-shots node tests/run.mjs   # 顺便截图（失败时也会�
 | process copy: …（4 个：导出、同 app 导入并对比 Clone、警告框 / 取消 / 错误文件、空流程导致 Design is invalid 的详细原因） | docs/14 |
 | userview copy: …（4 个：导出按钮只在 UI Builder、同 app 导入为新 Userview、警告框 / 取消 / 错误文件、临时 app 里 Save 后删除） | docs/16 |
 | canvas controls: 默认隐藏、工具栏开关 + localStorage、面板 ×、皮肤关掉后恢复 | docs/17 |
+| toolbar menu: 单一「Joget Skin」菜单、悬停/点击/Esc、Process / UI 项切换、皮肤关掉后消失 | docs/18 |
 | `node tests/updates-json.test.mjs`（无需 Joget） | docs/15 |
 | `node tests/pages.test.mjs`（无需 Joget） | CHANGELOG.md、docs/15 |
 | skin off: everything from v1.3.7 goes away | 全部 |

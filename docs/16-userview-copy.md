@@ -100,3 +100,5 @@
 - `#envVariable.x#` 引用会保留，但环境变量的值不会跟着导出。
 - 跨 app 导入时，id 若在目标 app 里还没用过，会沿用原来的 id。
 - `CustomBuilder.data` 的结构没有公开文档；Joget 升级后先跑测试（结构对不上时导入会停下，不硬写）。
+
+v1.4.3 起，导出/导入按钮在 [18. 工具栏「Joget Skin」菜单](18-tool-menu.md) 里，id 仍是 `#jskin-ucopy-export` / `#jskin-ucopy-import`。

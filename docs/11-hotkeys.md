@@ -46,3 +46,5 @@
 
 **排查**：按钮不见 → `document.querySelector("#builderToolbar .advanced-tools-toogle")`；URL 是否匹配 `PAGE_RE`（28 行）。
 测试：`hotkeys: …` 三个测试（位置/开关、App Composer 顺序、⌘ 映射），以及 `left-panel hotkey: …`（修改快捷键）。
+
+v1.4.3 起，工具栏上的快捷键按钮改由 [18. 工具栏「Joget Skin」菜单](18-tool-menu.md) 托管，id 仍是 `#jskin-hotkeys-btn`。测试要点开菜单再点它。

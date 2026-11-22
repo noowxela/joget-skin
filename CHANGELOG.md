@@ -10,7 +10,8 @@ Joget Skin 的用户可见变更，按版本从新到旧排列。日期为马来
 - 工具栏弹窗增加「检查更新」：对照 GitHub Pages 上的 `updates.json`，显示已是最新版或有新版本（并链到更新日志）。有新版本时可点「立即更新」。Firefox 目前不能由扩展自己触发安装（没有 `requestUpdateCheck`），会提示到 `about:addons` 检查，或等大约 24 小时自动更新。每天第一次打开弹窗时也会悄悄查一次，只有发现新版本才提示。从 about:debugging 临时加载的扩展不能自动更新。
 
 ### 改进
-- Process Builder 右下角的 Canvas Controls 提示默认隐藏，不再占画布。工具栏增加按钮，可随时显示或隐藏；选择会记在 localStorage。显示时会把提示移到画布右下角，避免被右侧属性面板挡住。面板上也可以点 × 关掉。关掉皮肤后恢复 Joget 原样。
+- 工具栏上 Joget Skin 加的按钮收成一个「Joget Skin ▾」菜单（扳手图标）。悬停或点击打开，把鼠标移进菜单不会马上关掉，按 Esc 或再点一次会关。菜单里有：Canvas Controls 开关（只在 Process Builder，并显示当前是已显示还是已隐藏）、快捷键，以及当前 Builder 的导出/导入（流程或 UI）。换 Builder 或关掉皮肤时菜单会跟着变。
+- Process Builder 右下角的 Canvas Controls 提示默认隐藏，不再占画布。可在「Joget Skin」菜单里再打开或关掉；选择会记在 localStorage。显示时会把提示移到画布右下角，避免被右侧属性面板挡住。面板上也可以点 × 关掉。关掉皮肤后恢复 Joget 原样。
 
 ### 修复
 - `release.sh` 发布 GitHub Pages 前会先 fetch `origin/gh-pages`，并以远端分支为基准提交，避免本地 `gh-pages` 过期时 push 被拒绝（non-fast-forward）。

@@ -296,6 +296,22 @@
     }
   }
 
+  function placeGroup(group, after) {
+    const menu = document.getElementById("jskin-tool-menu");
+    if (menu) {
+      if (group.parentElement !== menu) {
+        menu.append(group);
+      }
+      if (typeof window.__jskinToolMenuAdopt === "function") {
+        window.__jskinToolMenuAdopt();
+      }
+      return;
+    }
+    if (after && group.previousElementSibling !== after) {
+      after.after(group);
+    }
+  }
+
   /* ---------- toolbar button ---------- */
   function ensureButton() {
     const existing = document.getElementById(GROUP_ID);
@@ -313,9 +329,7 @@
     injectPage();
     const after = document.getElementById(HOTKEYS_GROUP_ID) || document.getElementById(OTHERS_GROUP_ID) || anchor;
     if (existing) {
-      if (existing.previousElementSibling !== after) {
-        after.after(existing);
-      }
+      placeGroup(existing, after);
       return;
     }
     const group = el("div", "btn-group toolbar-group me-3");
@@ -337,7 +351,7 @@
       mk(EXPORT_ID, "⬇ 导出此 UI", "把当前打开的 Userview 下载成 JSON（含依赖清单，敏感字段会清空）", doExport),
       mk(IMPORT_ID, "⬆ 导入 UI", "从 JSON 文件导入为当前 app 里的一个新 Userview（会写入服务器，不改写当前打开的 UI）", doImport),
     );
-    after.after(group);
+    placeGroup(group, after);
   }
 
   function run() {

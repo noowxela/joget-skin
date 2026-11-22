@@ -146,6 +146,20 @@ const shot = async (page, name, locator) => {
   else await page.screenshot({ path: p });
 };
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
+async function openToolMenu(page) {
+  await page.waitForSelector("#jskin-tool-btn", { timeout: 8000 });
+  if ((await page.getAttribute("#jskin-tool-btn", "aria-expanded")) === "true") {
+    return;
+  }
+  await page.hover("#jskin-tool-group");
+  try {
+    await page.waitForFunction(() => document.getElementById("jskin-tool-btn")?.getAttribute("aria-expanded") === "true", null, { timeout: 2000 });
+  } catch (e) {
+    await page.click("#jskin-tool-btn");
+    await page.waitForFunction(() => document.getElementById("jskin-tool-btn")?.getAttribute("aria-expanded") === "true", null, { timeout: 3000 });
+  }
+}
+
 const centred = (g, tol = 2) => Math.abs(g.leftGap - g.rightGap) <= tol && g.leftGap >= 0;
 
 /* ---------- tests ---------- */
@@ -315,6 +329,7 @@ test("left-panel hotkey: Ctrl+[ toggles; can be changed in the hotkeys panel", a
   await page.waitForTimeout(600);
   const b = await closed();
   // change it to Ctrl+Alt+K in the panel
+  await openToolMenu(page);
   await page.click("#jskin-hotkeys-btn");
   await page.waitForTimeout(300);
   await page.click("#jskin-hk-edit-leftpanel");
@@ -460,9 +475,10 @@ test("hotkeys: button after Advanced Tools, list opens, Esc / outside click clos
   await open(page, urls.textForm);
   await inject(page);
   const after = await page.evaluate(() => document.querySelector("#builderToolbar .advanced-tools-toogle").nextElementSibling?.id);
-  assert(after === "jskin-hotkeys-group", "button position: " + after);
+  assert(after === "jskin-tool-group", "button position: " + after);
   const propsOpen = () => page.evaluate(() => !document.body.classList.contains("no-right-panel"));
   const wasOpen = await propsOpen();
+  await openToolMenu(page);
   await page.click("#jskin-hotkeys-btn");
   await page.waitForTimeout(300);
   const rows = await page.locator("#jskin-hotkeys-panel tr").count();
@@ -472,10 +488,12 @@ test("hotkeys: button after Advanced Tools, list opens, Esc / outside click clos
   await page.waitForTimeout(300);
   assert((await page.locator("#jskin-hotkeys-panel").count()) === 0, "Esc did not close");
   assert((await propsOpen()) === wasOpen, "Esc also changed Joget's property panel");
+  await openToolMenu(page);
   await page.click("#jskin-hotkeys-btn");
   await page.mouse.click(30, 450); // left palette area
   await page.waitForTimeout(300);
   assert((await page.locator("#jskin-hotkeys-panel").count()) === 0, "outside click did not close");
+  await openToolMenu(page);
   await page.click("#jskin-hotkeys-btn");
   const pt = await page.evaluate(() => { // a canvas point not covered by the panel
     const c = document.querySelector("#builder_canvas").getBoundingClientRect(), k = document.querySelector("#jskin-hotkeys-panel").getBoundingClientRect();
@@ -492,8 +510,8 @@ test("hotkeys: on App Composer the button follows the show-others button", async
   await open(page, URLS.composer, "#builders");
   await inject(page);
   const ids = await page.evaluate(() => { const a = document.querySelector("#builderToolbar .advanced-tools-toogle"); return [a.nextElementSibling?.id, a.nextElementSibling?.nextElementSibling?.id]; });
-  assert(ids[0] === "jskin-others-group" && ids[1] === "jskin-hotkeys-group", "order " + ids);
-  return "Advanced Tools → 显示其他 Builder → 快捷键";
+  assert(ids[0] === "jskin-others-group" && ids[1] === "jskin-tool-group", "order " + ids);
+  return "Advanced Tools → 显示其他 Builder → Joget Skin 菜单";
 });
 
 test("hotkeys: Joget maps ⌘ to Ctrl (jquery.hotkeys) — list claims match", async (page) => {
@@ -741,15 +759,17 @@ async function openProcessBuilder(page) {
   await open(page, urls.process);
   await page.waitForFunction(() => window.ProcessBuilder && ProcessBuilder.currentProcessData && ProcessBuilder.currentProcessData.properties, null, { timeout: 20000 });
   await inject(page);
-  await page.waitForSelector("#jskin-pcopy-group", { timeout: 5000 });
+  await page.waitForSelector("#jskin-tool-btn", { timeout: 8000 });
 }
 async function exportBundle(page) {
+  await openToolMenu(page);
   const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.click("#jskin-pcopy-export")]);
   const file = path.join(os.tmpdir(), "jskin-" + Date.now() + "-" + dl.suggestedFilename());
   await dl.saveAs(file);
   return { file, name: dl.suggestedFilename(), bundle: JSON.parse(fs.readFileSync(file, "utf8")) };
 }
 async function chooseImport(page, file) {
+  await openToolMenu(page);
   const [fc] = await Promise.all([page.waitForEvent("filechooser", { timeout: 10000 }), page.click("#jskin-pcopy-import")]);
   await fc.setFiles(file);
   await page.waitForSelector("#jskin-pcopy-dialog", { timeout: 15000 });
@@ -758,8 +778,11 @@ const writeTmp = (name, obj) => { const f = path.join(os.tmpdir(), "jskin-" + Da
 
 test("process copy: export button only on process builder, bundle re-keyed, secrets blanked", async (page) => {
   await openProcessBuilder(page);
-  const order = await page.evaluate(() => { const a = document.querySelector("#builderToolbar .advanced-tools-toogle"); return [a.nextElementSibling?.id, a.nextElementSibling?.nextElementSibling?.id]; });
-  assert(order[0] === "jskin-hotkeys-group" && order[1] === "jskin-pcopy-group", "order " + order);
+  const order = await page.evaluate(() => document.querySelector("#builderToolbar .advanced-tools-toogle")?.nextElementSibling?.id);
+  assert(order === "jskin-tool-group", "toolbar order " + order);
+  await openToolMenu(page);
+  const inside = await page.evaluate(() => [...document.querySelectorAll("#jskin-tool-menu [id$='-group']")].map((e) => e.id));
+  assert(inside.includes("jskin-hotkeys-group") && inside.includes("jskin-pcopy-group"), "menu items " + inside);
   // put dummy credentials into the in-memory data (never saved) to check they are blanked
   await page.evaluate(() => {
     const pid = ProcessBuilder.currentProcessData.properties.id;
@@ -962,15 +985,17 @@ async function openUserviewBuilder(page, url) {
   await open(page, url || urls.userview);
   await page.waitForFunction(() => window.CustomBuilder && CustomBuilder.builderType === "userview" && CustomBuilder.data && CustomBuilder.data.properties, null, { timeout: 20000 });
   await inject(page);
-  await page.waitForSelector("#jskin-ucopy-group", { timeout: 8000 });
+  await page.waitForSelector("#jskin-tool-btn", { timeout: 8000 });
 }
 async function exportUvBundle(page) {
+  await openToolMenu(page);
   const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.click("#jskin-ucopy-export")]);
   const file = path.join(os.tmpdir(), "jskin-" + Date.now() + "-" + dl.suggestedFilename());
   await dl.saveAs(file);
   return { file, name: dl.suggestedFilename(), bundle: JSON.parse(fs.readFileSync(file, "utf8")) };
 }
 async function chooseUvImport(page, file) {
+  await openToolMenu(page);
   const [fc] = await Promise.all([page.waitForEvent("filechooser", { timeout: 10000 }), page.click("#jskin-ucopy-import")]);
   await fc.setFiles(file);
   await page.waitForSelector("#jskin-ucopy-dialog", { timeout: 20000 });
@@ -1029,10 +1054,13 @@ async function csrfPost(page, url, fields) {
 test("userview copy: export button only on userview builder, bundle content, secrets blanked", async (page) => {
   await openUserviewBuilder(page);
   const order = await page.evaluate(() => [...document.querySelectorAll("#builderToolbar [id$='-group']")].map((e) => e.id));
-  assert(order.includes("jskin-ucopy-group"), "ucopy group missing: " + order);
-  const hi = order.indexOf("jskin-hotkeys-group");
-  const ui = order.indexOf("jskin-ucopy-group");
-  assert(hi >= 0 && ui === hi + 1, "ucopy should follow hotkeys: " + order);
+  assert(order.includes("jskin-tool-group"), "tool menu missing: " + order);
+  await openToolMenu(page);
+  const inside = await page.evaluate(() => [...document.querySelectorAll("#jskin-tool-menu [id$='-group']")].map((e) => e.id));
+  assert(inside.includes("jskin-hotkeys-group") && inside.includes("jskin-ucopy-group"), "menu items " + inside);
+  const hi = inside.indexOf("jskin-hotkeys-group");
+  const ui = inside.indexOf("jskin-ucopy-group");
+  assert(hi >= 0 && ui > hi, "ucopy should follow hotkeys in the menu: " + inside);
   // plant a secret + an env hash on a live copy of the json so export can blank / keep them
   await page.evaluate(() => {
     if (!CustomBuilder.data.setting) CustomBuilder.data.setting = { className: "", properties: {} };
@@ -1255,7 +1283,9 @@ test("canvas controls: hidden by default, toolbar toggles and persists, x closes
   await page.evaluate(() => localStorage.removeItem("jogetSkinCanvasControls"));
   await page.waitForSelector("#pbuilder-controls-indicator", { timeout: 15000 });
   await inject(page);
-  await page.waitForSelector("#jskin-cc-group", { timeout: 5000 });
+  await page.waitForSelector("#jskin-tool-btn", { timeout: 8000 });
+  await openToolMenu(page);
+  await page.waitForSelector("#jskin-cc-btn", { timeout: 5000 });
   const vis = () => page.evaluate(() => {
     const el = document.getElementById("pbuilder-controls-indicator");
     if (!el) return { present: false };
@@ -1283,6 +1313,7 @@ test("canvas controls: hidden by default, toolbar toggles and persists, x closes
   const before = await vis();
   assert(before.btn && !before.vis && before.display === "none" && !before.on && !before.store, "not hidden by default: " + JSON.stringify(before));
   await shot(page, "canvasctl-closed");
+  await openToolMenu(page);
   await page.click("#jskin-cc-btn");
   await page.waitForTimeout(300);
   const opened = await vis();
@@ -1298,6 +1329,7 @@ test("canvas controls: hidden by default, toolbar toggles and persists, x closes
   await page.waitForTimeout(300);
   const afterX = await vis();
   assert(!afterX.vis && afterX.store === "0" && afterX.pressed === "false", "x did not hide: " + JSON.stringify(afterX));
+  await openToolMenu(page);
   await page.click("#jskin-cc-btn");
   await page.waitForTimeout(200);
   assert((await vis()).store === "1", "toolbar did not turn it back on");
@@ -1314,6 +1346,43 @@ test("canvas controls: hidden by default, toolbar toggles and persists, x closes
   const onForm = await page.evaluate(() => !!document.getElementById("jskin-cc-group"));
   assert(!onForm, "button on the form builder");
   return `default hidden; toggle + x persist in localStorage; skin off restores Joget panel; not on form builder`;
+});
+
+test("toolbar menu: one button holds process items, hover/click/Esc, UI builder swaps in UI copy", async (page) => {
+  await open(page, urls.process);
+  await page.waitForFunction(() => window.ProcessBuilder && ProcessBuilder.currentProcessData && ProcessBuilder.currentProcessData.properties, null, { timeout: 20000 });
+  await inject(page);
+  await page.waitForSelector("#jskin-tool-btn", { timeout: 8000 });
+  const closed = await page.evaluate(() => document.getElementById("jskin-tool-btn")?.getAttribute("aria-expanded"));
+  assert(closed === "false", "menu should start closed");
+  await page.hover("#jskin-tool-group");
+  await page.waitForFunction(() => document.getElementById("jskin-tool-btn")?.getAttribute("aria-expanded") === "true", null, { timeout: 3000 });
+  const procItems = await page.evaluate(() => [...document.querySelectorAll("#jskin-tool-menu button")].map((b) => b.id + ":" + b.textContent.replace(/\s+/g, " ").trim()));
+  assert(procItems.some((t) => t.startsWith("jskin-cc-btn:") && /Canvas Controls/.test(t)), "cc missing: " + procItems);
+  assert(procItems.some((t) => t.startsWith("jskin-hotkeys-btn:") && /快捷键/.test(t)), "hotkeys missing: " + procItems);
+  assert(procItems.some((t) => t.startsWith("jskin-pcopy-export:") && /导出此流程/.test(t)), "export missing: " + procItems);
+  assert(procItems.some((t) => t.startsWith("jskin-pcopy-import:") && /导入流程/.test(t)), "import missing: " + procItems);
+  assert(!procItems.some((t) => t.includes("jskin-ucopy")), "ui copy on process builder: " + procItems);
+  await shot(page, "toolmenu-process");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.getElementById("jskin-tool-btn")?.getAttribute("aria-expanded") === "false", null, { timeout: 3000 });
+  await page.click("#jskin-tool-btn");
+  await page.waitForFunction(() => document.getElementById("jskin-tool-btn")?.getAttribute("aria-expanded") === "true", null, { timeout: 3000 });
+  await page.click("#jskin-tool-btn");
+  await page.waitForFunction(() => document.getElementById("jskin-tool-btn")?.getAttribute("aria-expanded") === "false", null, { timeout: 3000 });
+  await open(page, urls.userview);
+  await page.waitForFunction(() => window.CustomBuilder && CustomBuilder.builderType === "userview" && CustomBuilder.data, null, { timeout: 20000 });
+  await inject(page);
+  await openToolMenu(page);
+  const uiItems = await page.evaluate(() => [...document.querySelectorAll("#jskin-tool-menu button")].map((b) => b.id));
+  assert(uiItems.includes("jskin-ucopy-export") && uiItems.includes("jskin-ucopy-import"), "ui copy missing: " + uiItems);
+  assert(uiItems.includes("jskin-hotkeys-btn") && !uiItems.includes("jskin-cc-btn") && !uiItems.includes("jskin-pcopy-export"), "process leftovers on UI builder: " + uiItems);
+  await shot(page, "toolmenu-userview");
+  await setStore(page, { jogetSkinEnabled: false });
+  await page.waitForTimeout(600);
+  const off = await page.evaluate(() => ({ menu: !!document.getElementById("jskin-tool-group"), btn: !!document.getElementById("jskin-tool-btn") }));
+  assert(!off.menu && !off.btn, "menu stayed after skin off: " + JSON.stringify(off));
+  return "process: cc + hotkeys + process copy; Esc/click toggle; UI builder swaps in UI copy; skin off removes menu";
 });
 
 /* ---------- runner ---------- */

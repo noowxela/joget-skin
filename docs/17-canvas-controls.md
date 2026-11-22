@@ -42,3 +42,5 @@ Process Builder 右下角有一块 Joget 自带的「Canvas Controls」提示（
 - 按钮没出现：`<html>` 有没有 `joget-skin`；路径是不是 `.../process/builder`；工具栏里有没有 `.advanced-tools-toogle`。
 - 面板一直在：看 `<html>` 有没有误加 `jskin-cc-on`，或 CSS 没注入。
 - 打开后看不见：Joget 可能还没建出 `#pbuilder-controls-indicator`（刚进 Process Builder 时等一两秒）；或之前被 Joget 的 `hidden` 收起，我们在显示时会去掉这个 class。若提示仍在属性面板后面，检查面板有没有被移到 `#builder_canvas` 里（`data-jskin-placed="1"`）。
+
+v1.4.3 起，开关按钮在 [18. 工具栏「Joget Skin」菜单](18-tool-menu.md) 里，id 仍是 `#jskin-cc-btn`。菜单项会显示当前是「已隐藏」还是「✓ 已显示」。

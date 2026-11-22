@@ -110,3 +110,5 @@ Joget 点 Save 时会跑 `ProcessBuilder.beforeSaveValidation` → `ProcessBuild
 - 按钮没出现：`<html>` 有没有 `joget-skin`；路径是不是 `.../process/builder`；工具栏里有没有 `.advanced-tools-toogle`。
 - 点了没反应 / “页面脚本没有回应”：`about:debugging` 看 `pcopy-page.js` 是否被拦（`web_accessible_resources`），Console 里有没有 `ProcessBuilder` 报错。
 - 导入停在“数据结构对不上”：Joget 版本变了，对照上面的依赖表到新 war 里查。
+
+v1.4.3 起，导出/导入按钮在 [18. 工具栏「Joget Skin」菜单](18-tool-menu.md) 里，id 仍是 `#jskin-pcopy-export` / `#jskin-pcopy-import`。

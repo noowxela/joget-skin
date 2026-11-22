@@ -103,6 +103,7 @@
         "*://*/jw/web/console/app/*/builder*"
       ],
       "js": [
+        "toolmenu.js",
         "hotkeys.js",
         "propcollapse.js",
         "edgetoggles.js",

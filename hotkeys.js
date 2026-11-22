@@ -336,6 +336,22 @@
     }
   }
 
+  function placeGroup(group, after) {
+    const menu = document.getElementById("jskin-tool-menu");
+    if (menu) {
+      if (group.parentElement !== menu) {
+        menu.append(group);
+      }
+      if (typeof window.__jskinToolMenuAdopt === "function") {
+        window.__jskinToolMenuAdopt();
+      }
+      return;
+    }
+    if (after && group.previousElementSibling !== after) {
+      after.after(group);
+    }
+  }
+
   function ensureButton() {
     const existing = document.getElementById(GROUP_ID);
     if (!skinOn() || !onPage()) {
@@ -353,9 +369,7 @@
     const next = anchor.nextElementSibling;
     const after = next && next.id === OTHERS_GROUP_ID ? next : anchor;
     if (existing) {
-      if (existing.previousElementSibling !== after) {
-        after.after(existing);
-      }
+      placeGroup(existing, after);
       return;
     }
     const group = el("div", "btn-group toolbar-group me-3");
@@ -377,7 +391,7 @@
       }
     });
     group.append(btn);
-    after.after(group);
+    placeGroup(group, after);
   }
 
   function run() {
