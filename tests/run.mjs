@@ -9,9 +9,11 @@
  *      SHOTS=<dir> to save screenshots, PLAYWRIGHT=<path to playwright index.mjs> if
  *      `import("playwright")` does not resolve from here.
  *
- * Read-only against Joget: it only opens pages, clicks elements to select them, opens/closes
- * panels and injects the extension's CSS/JS (like the content scripts would, with a stubbed
- * browser.storage). It never clicks Save and never submits anything.
+ * Mostly read-only against Joget: it opens pages, clicks elements, opens/closes panels and
+ * injects the extension's CSS/JS (like the content scripts would, with a stubbed
+ * browser.storage). Process copy never clicks Save. Userview copy import creates a new
+ * userview and then deletes it; the Save test copies a temporary app, verifies, then deletes
+ * that app so local apps are unchanged.
  */
 import fs from "fs";
 import os from "os";
@@ -824,6 +826,318 @@ test("process copy: warnings dialog (missing form/plugin, renames, re-enter fiel
   await page.waitForTimeout(600);
   assert(!(await page.$("#jskin-pcopy-group")), "buttons still there with skin off");
   return `warnings listed (missing form + plugin, re-enter field, subflow, participant renames to jskin_remote_proc_*); cancel / bad file → no change; skin off → buttons removed (${pid})`;
+});
+
+
+/* ---------- v1.4.2 userview / UI copy ---------- */
+
+async function waitUvReady(page, id) {
+  await page.waitForFunction((id) => {
+    const CB = window.CustomBuilder;
+    if (!CB || CB.builderType !== "userview" || !CB.data || !CB.data.properties) return false;
+    const cur = CB.id || CB.data.properties.id;
+    return cur === id;
+  }, id, { timeout: 20000 });
+  // ajaxRenderBuilder shows a full-viewport "All done! Your builder is ready." overlay
+  // and only removes body.initializing after ~1.7s
+  await page.waitForFunction(() => !document.body.classList.contains("initializing"), { timeout: 20000 });
+  await page.waitForFunction(() => {
+    const bar = document.querySelector("#builderToolbar");
+    const canvas = document.querySelector("#builder_canvas");
+    if (!bar || !canvas) return false;
+    const r = canvas.getBoundingClientRect();
+    const text = document.body.innerText || "";
+    return r.width > 100 && r.height > 100 && !/All done! Your builder is ready|Loading your content now/.test(text);
+  }, { timeout: 20000 });
+  await page.waitForTimeout(300);
+}
+async function openUserviewBuilder(page, url) {
+  await open(page, url || urls.userview);
+  await page.waitForFunction(() => window.CustomBuilder && CustomBuilder.builderType === "userview" && CustomBuilder.data && CustomBuilder.data.properties, null, { timeout: 20000 });
+  await inject(page);
+  await page.waitForSelector("#jskin-ucopy-group", { timeout: 8000 });
+}
+async function exportUvBundle(page) {
+  const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.click("#jskin-ucopy-export")]);
+  const file = path.join(os.tmpdir(), "jskin-" + Date.now() + "-" + dl.suggestedFilename());
+  await dl.saveAs(file);
+  return { file, name: dl.suggestedFilename(), bundle: JSON.parse(fs.readFileSync(file, "utf8")) };
+}
+async function chooseUvImport(page, file) {
+  const [fc] = await Promise.all([page.waitForEvent("filechooser", { timeout: 10000 }), page.click("#jskin-ucopy-import")]);
+  await fc.setFiles(file);
+  await page.waitForSelector("#jskin-ucopy-dialog", { timeout: 20000 });
+}
+const uvInfo = (page) => page.evaluate(() => {
+  const CB = window.CustomBuilder;
+  let json;
+  try { json = JSON.parse(CB.getJson()); } catch { json = JSON.parse(JSON.stringify(CB.data)); }
+  return { id: CB.id || (json.properties && json.properties.id) || "", name: (json.properties && json.properties.name) || "", json, appId: CB.appId, appVersion: CB.appVersion };
+});
+async function listUserviewIds(page) {
+  return page.evaluate(async () => {
+    const url = CustomBuilder.contextPath + "/web/json/console/app/" + CustomBuilder.appId + "/" + CustomBuilder.appVersion + "/userview/options";
+    const r = await fetch(url, { credentials: "same-origin" });
+    const j = await r.json();
+    const arr = Array.isArray(j) ? j : (j.data || []);
+    return arr.map((x) => x && (x.value || x.id)).filter(Boolean);
+  });
+}
+async function deleteUserviewId(page, id) {
+  return page.evaluate(async (id) => {
+    const url = CustomBuilder.contextPath + "/web/console/app/" + CustomBuilder.appId + "/" + CustomBuilder.appVersion + "/userview/delete";
+    return await new Promise((resolve) => {
+      window.jQuery.ajax({
+        type: "POST", url, data: { ids: id }, dataType: "text",
+        success: (_t, _s, xhr) => resolve({ ok: true, status: xhr.status }),
+        error: (xhr) => resolve({ ok: false, status: xhr && xhr.status }),
+      });
+    });
+  }, id);
+}
+async function listAppIds(page) {
+  return page.evaluate(async () => {
+    const root = (window.CustomBuilder && CustomBuilder.contextPath) || "/jw";
+    const r = await fetch(root + "/web/json/console/app/list", { credentials: "same-origin" });
+    const j = await r.json();
+    const rows = j.data || j;
+    return (Array.isArray(rows) ? rows : []).map((a) => a.id || a.appId || a.value).filter(Boolean).sort();
+  });
+}
+async function csrfPost(page, url, fields) {
+  return page.evaluate(async ({ url, fields }) => {
+    if (window.jQuery && typeof window.jQuery.ajax === "function") {
+      return await new Promise((resolve) => {
+        window.jQuery.ajax({
+          type: "POST", url, data: fields, dataType: "text",
+          success: (text, _s, xhr) => resolve({ ok: true, status: xhr.status, url: xhr.responseURL || url, text: (text || "").slice(0, 2000) }),
+          error: (xhr) => resolve({ ok: false, status: xhr && xhr.status, url, text: ((xhr && xhr.responseText) || "").slice(0, 2000) }),
+        });
+      });
+    }
+    return { ok: false, status: 0, url, text: "jQuery.ajax not available" };
+  }, { url, fields });
+}
+
+test("userview copy: export button only on userview builder, bundle content, secrets blanked", async (page) => {
+  await openUserviewBuilder(page);
+  const order = await page.evaluate(() => [...document.querySelectorAll("#builderToolbar [id$='-group']")].map((e) => e.id));
+  assert(order.includes("jskin-ucopy-group"), "ucopy group missing: " + order);
+  const hi = order.indexOf("jskin-hotkeys-group");
+  const ui = order.indexOf("jskin-ucopy-group");
+  assert(hi >= 0 && ui === hi + 1, "ucopy should follow hotkeys: " + order);
+  // plant a secret + an env hash on a live copy of the json so export can blank / keep them
+  await page.evaluate(() => {
+    if (!CustomBuilder.data.setting) CustomBuilder.data.setting = { className: "", properties: {} };
+    if (!CustomBuilder.data.setting.properties) CustomBuilder.data.setting.properties = {};
+    CustomBuilder.data.setting.properties.jskinTestPassword = "s3cret-value";
+    CustomBuilder.data.setting.properties.jskinTestEnv = "#envVariable.jskin_missing_env#";
+    CustomBuilder.json = JSON.stringify(CustomBuilder.data);
+  });
+  const { file, name, bundle } = await exportUvBundle(page);
+  // revert planted fields so we never risk saving them
+  await page.evaluate(() => {
+    if (CustomBuilder.data.setting && CustomBuilder.data.setting.properties) {
+      delete CustomBuilder.data.setting.properties.jskinTestPassword;
+      delete CustomBuilder.data.setting.properties.jskinTestEnv;
+      CustomBuilder.json = JSON.stringify(CustomBuilder.data);
+    }
+  });
+  assert(bundle.kind === "joget-userview-bundle" && bundle.v === 1, "kind/v " + bundle.kind + " " + bundle.v);
+  assert(bundle.userview && bundle.userview.properties && bundle.userview.properties.id, "missing userview json");
+  assert(bundle.source && bundle.source.appId && bundle.source.userviewId, "missing source: " + JSON.stringify(bundle.source));
+  assert(bundle.requires && Array.isArray(bundle.requires.forms) && Array.isArray(bundle.requires.plugins), "requires: " + JSON.stringify(bundle.requires));
+  assert(Array.isArray(bundle.requires.envVariables) && bundle.requires.envVariables.includes("jskin_missing_env"), "env not scanned: " + JSON.stringify(bundle.requires.envVariables));
+  const pw = bundle.userview.setting && bundle.userview.setting.properties && bundle.userview.setting.properties.jskinTestPassword;
+  const ev = bundle.userview.setting && bundle.userview.setting.properties && bundle.userview.setting.properties.jskinTestEnv;
+  assert(pw === "", "password not blanked: " + pw);
+  assert(ev === "#envVariable.jskin_missing_env#", "env hash was rewritten: " + ev);
+  assert((bundle.sensitive || []).some((p) => /jskinTestPassword/.test(p)), "sensitive path missing: " + JSON.stringify(bundle.sensitive));
+  assert(/\.userview\.json$/.test(name) && name.indexOf(bundle.source.appId) >= 0, "filename " + name);
+  await shot(page, "ucopy-toolbar", "#builderToolbar");
+  // not on process or form builder
+  await openProcessBuilder(page);
+  assert(!(await page.$("#jskin-ucopy-group")), "ucopy buttons on the process builder");
+  await open(page, urls.textForm);
+  await inject(page);
+  await page.waitForTimeout(400);
+  assert(!(await page.$("#jskin-ucopy-group")), "ucopy buttons on the form builder");
+  return `bundle ${name} kind=${bundle.kind} v=${bundle.v} id=${bundle.source.userviewId}; password blanked; env hash kept; buttons only on userview builder`;
+});
+
+test("userview copy: import into the same app creates a new userview, does not overwrite the open one", async (page) => {
+  await openUserviewBuilder(page);
+  const before = await uvInfo(page);
+  const beforeIds = await listUserviewIds(page);
+  const { file, bundle } = await exportUvBundle(page);
+  await chooseUvImport(page, file);
+  const txt = await page.textContent("#jskin-ucopy-dialog");
+  assert(/导入为新 UI/.test(txt) && /写入服务器/.test(txt), "dialog missing new-userview / persist wording: " + txt.slice(0, 400));
+  const expectId = beforeIds.includes(bundle.source.userviewId) ? bundle.source.userviewId + "_2" : bundle.source.userviewId;
+  // if _2 already exists incrementSuffix may pick a higher number — accept _\d+$ when renamed
+  assert(new RegExp(bundle.source.userviewId + "(_\\d+)?").test(txt), "new id not shown: " + txt.slice(0, 400));
+  await page.click("#jskin-ucopy-dialog .btn-primary");
+  await page.waitForFunction((oldId) => {
+    const err = document.querySelector("#jskin-ucopy-dialog .jskin-ucopy-error");
+    if (err && err.textContent) return "ERR:" + err.textContent;
+    const CB = window.CustomBuilder;
+    if (!CB || CB.builderType !== "userview" || !CB.data || !CB.data.properties) return false;
+    const id = CB.id || CB.data.properties.id;
+    return id && id !== oldId ? "OK:" + id : false;
+  }, before.id, { timeout: 40000 });
+  const waitMsg = await page.evaluate(() => {
+    const err = document.querySelector("#jskin-ucopy-dialog .jskin-ucopy-error");
+    if (err && err.textContent) return "ERR:" + err.textContent;
+    const CB = window.CustomBuilder;
+    const id = CB && (CB.id || (CB.data && CB.data.properties && CB.data.properties.id));
+    return "OK:" + id;
+  });
+  if (waitMsg.indexOf("ERR:") === 0) throw new Error(waitMsg.slice(4));
+  const after = await uvInfo(page);
+  const afterIds = await listUserviewIds(page);
+  let err = "";
+  try {
+    assert(after.id !== before.id, "still on the original userview: " + after.id);
+    assert(afterIds.includes(before.id), "original userview disappeared: " + afterIds);
+    assert(afterIds.includes(after.id), "new userview not in list: " + afterIds + " current=" + after.id);
+    assert(after.json.properties.id === after.id, "json id mismatch " + after.json.properties.id + " vs " + after.id);
+    assert(/ \(Copy\)/.test(after.name) || after.id === bundle.source.userviewId, "name should get (Copy) when id changes: " + after.name);
+    // structural compare: category count
+    const cats = (j) => (j.categories || j.category || []);
+    assert(JSON.stringify(Object.keys(after.json.properties)).indexOf("id") >= 0, "properties missing");
+  } catch (e) {
+    err = e.message;
+  }
+  await waitUvReady(page, after.id);
+  await shot(page, "ucopy-imported-ui");
+  const del = await deleteUserviewId(page, after.id);
+  const idsAfterDel = await listUserviewIds(page);
+  if (!idsAfterDel.includes(before.id) || idsAfterDel.includes(after.id)) {
+    throw new Error("cleanup failed: delete=" + JSON.stringify(del) + " ids=" + idsAfterDel + (err ? " ; earlier: " + err : ""));
+  }
+  if (err) throw new Error(err);
+  return `imported ${bundle.source.userviewId} -> ${after.id} 「${after.name}」; original ${before.id} kept; deleted the copy (${del.status})`;
+});
+
+test("userview copy: warnings dialog (missing deps), cancel and bad file change nothing", async (page) => {
+  await openUserviewBuilder(page);
+  const before = await uvInfo(page);
+  const beforeIds = (await listUserviewIds(page)).slice().sort();
+  const { bundle } = await exportUvBundle(page);
+  bundle.userview.properties = bundle.userview.properties || {};
+  // plant missing refs on a copied menu-like object under properties so walk() sees them
+  bundle.userview.properties.jskinMissingForm = { formId: "jskin_missing_form" };
+  bundle.userview.properties.jskinMissingList = { listId: "jskin_missing_list" };
+  bundle.userview.properties.jskinMissingProc = { processId: "jskin_missing_process", activityId: "jskin_missing_activity" };
+  bundle.userview.properties.jskinMissingUv = { userviewId: "jskin_missing_userview" };
+  bundle.userview.properties.jskinMissingPlugin = { className: "org.jskin.missing.DoesNotExistPlugin" };
+  bundle.userview.properties.jskinMissingEnv = "prefix #envVariable.jskin_missing_env# suffix";
+  bundle.userview.properties.jskinFakePassword = "should-be-listed-if-exported";
+  // pretend export blanked it
+  bundle.sensitive = (bundle.sensitive || []).concat(["userview.properties.jskinFakePassword"]);
+  const fake = writeTmp("ucopy-missing.json", bundle);
+  await chooseUvImport(page, fake);
+  const txt = await page.textContent("#jskin-ucopy-dialog");
+  assert(/jskin_missing_form/.test(txt), "missing form not warned: " + txt);
+  assert(/jskin_missing_list/.test(txt), "missing list not warned: " + txt);
+  assert(/jskin_missing_process/.test(txt), "missing process not warned: " + txt);
+  assert(/jskin_missing_userview/.test(txt), "missing userview not warned: " + txt);
+  assert(/org\.jskin\.missing\.DoesNotExistPlugin/.test(txt), "missing plugin not warned: " + txt);
+  assert(!/org\.joget\.apps\.userview\.model\.Userview[<\s]/.test(txt) && !/UserviewCategory/.test(txt), "built-in userview types flagged as missing plugins: " + txt);
+  assert(/jskin_missing_env/.test(txt), "missing env not warned: " + txt);
+  assert(/jskinFakePassword/.test(txt), "sensitive field not listed: " + txt);
+  await page.evaluate(() => document.querySelectorAll(".jskin-ucopy-toast").forEach((t) => t.remove()));
+  await shot(page, "ucopy-warnings-dialog", "#jskin-ucopy-dialog .jskin-ucopy-box");
+  await page.click("#jskin-ucopy-dialog .btn-secondary");
+  await page.waitForTimeout(300);
+  assert(!(await page.$("#jskin-ucopy-dialog")), "cancel did not close dialog");
+  const afterCancel = await uvInfo(page);
+  const idsCancel = (await listUserviewIds(page)).slice().sort();
+  assert(afterCancel.id === before.id && JSON.stringify(idsCancel) === JSON.stringify(beforeIds), "cancel created/changed userviews: " + idsCancel);
+
+  const bad = writeTmp("ucopy-bad.json", { kind: "joget-process-bundle", v: 1 });
+  await chooseUvImport(page, bad);
+  const err = await page.textContent("#jskin-ucopy-dialog");
+  assert(/不是 UI/.test(err) && !(await page.$("#jskin-ucopy-dialog .btn-primary")), "bad file dialog: " + err);
+  await page.click("#jskin-ucopy-dialog .btn-secondary, #jskin-ucopy-dialog button");
+  await page.waitForTimeout(300);
+  assert(!(await page.$("#jskin-ucopy-dialog")), "bad file dialog stuck");
+  const idsBad = (await listUserviewIds(page)).slice().sort();
+  assert(JSON.stringify(idsBad) === JSON.stringify(beforeIds), "bad file changed userviews: " + idsBad);
+
+  await setStore(page, { jogetSkinEnabled: false });
+  await page.waitForTimeout(600);
+  assert(!(await page.$("#jskin-ucopy-group")), "buttons still there with skin off");
+  return `warnings listed (form, datalist, process, userview, plugin, env, sensitive); cancel / bad file → no change; skin off → buttons removed (${before.id})`;
+});
+
+test("userview copy: save in a temporary app copy then delete the app", async (page) => {
+  const TMP = "jskinucopytmp";
+  await openUserviewBuilder(page);
+  const originUv = await uvInfo(page);
+  // drop a leftover temp app from a previous failed run
+  let apps = await listAppIds(page);
+  if (apps.includes(TMP)) {
+    await csrfPost(page, `${BASE}/web/console/app/${TMP}/latest/delete`, {});
+    await csrfPost(page, `${BASE}/web/console/app/${TMP}/1/delete`, {});
+    apps = await listAppIds(page);
+  }
+  const beforeApps = apps.slice();
+  assert(!beforeApps.includes(TMP), "could not remove leftover temp app: " + beforeApps);
+  try {
+    const created = await csrfPost(page, `${BASE}/web/console/app/submit`, {
+      type: "duplicate",
+      copyAppId: APP,
+      id: TMP,
+      name: "jskin ucopy tmp",
+    });
+    const appsAfterCreate = await listAppIds(page);
+    if (!appsAfterCreate.includes(TMP)) {
+      throw new Error("temp app was not created: HTTP " + created.status + " " + (created.text || "").slice(0, 400) + " apps=" + appsAfterCreate);
+    }
+    const tmpUrl = `${BASE}/web/console/app/${TMP}/1/userview/builder/${originUv.id}`;
+    await openUserviewBuilder(page, tmpUrl);
+    const { file, bundle } = await exportUvBundle(page);
+    await chooseUvImport(page, file);
+    await page.click("#jskin-ucopy-dialog .btn-primary");
+    await page.waitForFunction((oldId) => {
+      const CB = window.CustomBuilder;
+      if (!CB || CB.appId !== "jskinucopytmp" || !CB.data || !CB.data.properties) return false;
+      const id = CB.id || CB.data.properties.id;
+      return id && id !== oldId;
+    }, originUv.id, { timeout: 40000 });
+    const imported = await uvInfo(page);
+    // click Save (definition is already persisted; this confirms Save still works)
+    const saveBtn = await page.$("#save-btn, #save-btn-toolbar, a#save-btn, button#save-btn");
+    if (saveBtn) {
+      await saveBtn.click();
+      await page.waitForTimeout(2000);
+    }
+    const newUrl = `${BASE}/web/console/app/${TMP}/1/userview/builder/${imported.id}`;
+    await page.goto(newUrl, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.CustomBuilder && CustomBuilder.data && CustomBuilder.data.properties, null, { timeout: 20000 });
+    const reloaded = await uvInfo(page);
+    assert(reloaded.id === imported.id, "reload id " + reloaded.id + " != " + imported.id);
+    assert(reloaded.json.properties.id === imported.id, "persisted json id mismatch");
+    assert((reloaded.json.properties.name || "") === imported.name, "persisted name mismatch: " + reloaded.json.properties.name);
+    await waitUvReady(page, reloaded.id);
+    await shot(page, "ucopy-imported-saved");
+    return `temp app ${TMP}: imported ${bundle.source.userviewId} -> ${reloaded.id} 「${reloaded.name}」, survived reload` + (saveBtn ? " and Save" : "");
+  } finally {
+    // delete every version we can; must leave local apps unchanged
+    await csrfPost(page, `${BASE}/web/console/app/${TMP}/latest/delete`, {}).catch(() => {});
+    await csrfPost(page, `${BASE}/web/console/app/${TMP}/1/delete`, {}).catch(() => {});
+    // if ConnectionManager vanished after navigation, go back to a builder that still has it
+    const leftover = await listAppIds(page).catch(() => null);
+    if (leftover && leftover.includes(TMP)) {
+      await open(page, urls.userview).catch(() => {});
+      await csrfPost(page, `${BASE}/web/console/app/${TMP}/latest/delete`, {}).catch(() => {});
+      await csrfPost(page, `${BASE}/web/console/app/${TMP}/1/delete`, {}).catch(() => {});
+    }
+    const afterApps = await listAppIds(page);
+    assert(!afterApps.includes(TMP), "temp app still present after cleanup: " + afterApps);
+    assert(JSON.stringify(afterApps) === JSON.stringify(beforeApps), "local apps changed: before=" + beforeApps + " after=" + afterApps);
+  }
 });
 
 /* ---------- runner ---------- */

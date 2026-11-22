@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Joget Skin (builder + userview)",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Declutter tweaks, App Composer layout, optional Indigo theme and a save chime for Joget DX 9 builders and userview pages (toggleable).",
   "icons": {
     "16": "icons/fox-16.png",
@@ -106,7 +106,8 @@
         "hotkeys.js",
         "propcollapse.js",
         "edgetoggles.js",
-        "pcopy-content.js"
+        "pcopy-content.js",
+        "ucopy-content.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
@@ -115,7 +116,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "pcopy-page.js"
+        "pcopy-page.js",
+        "ucopy-page.js"
       ],
       "matches": [
         "*://*/jw/*"
