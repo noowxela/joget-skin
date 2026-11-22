@@ -749,3 +749,35 @@ html.joget-skin .jskin-ucopy-toast {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
 
+/* ---------- v1.4.3 Canvas Controls (canvasctl.js) ---------- */
+/* Fully hide Joget's #pbuilder-controls-indicator (pbuilder.css only collapses it). */
+html.joget-skin:not(.jskin-cc-on) #pbuilder-controls-indicator {
+  display: none !important;
+}
+/* Joget default is right:50px / z-index:9, under the property pane.
+   canvasctl.js also snaps to #builder_canvas; this is the pre-JS fallback. */
+html.joget-skin.jskin-cc-on #pbuilder-controls-indicator {
+  z-index: 15;
+  right: calc(40px + var(--builder-right-panel-width, 20vw) + 16px);
+}
+html.joget-skin #jskin-cc-group .btn i {
+  pointer-events: none;
+}
+html.joget-skin #pbuilder-controls-indicator #jskin-cc-x {
+  order: 2;
+  flex: 0 0 auto;
+  margin-left: 6px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  min-width: 22px;
+  min-height: 22px;
+  box-shadow: none;
+}
+html.joget-skin #pbuilder-controls-indicator #jskin-cc-x:hover {
+  color: #fecaca;
+}

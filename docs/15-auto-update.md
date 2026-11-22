@@ -34,7 +34,7 @@ xpi 放在 GitHub Release 资产里，而不是 Pages 上，免得二进制包�
 ./release.sh --dry-run  # 只做本地步骤，不访问 AMO / GitHub / git push
 ```
 
-脚本会：确认工作区干净（忽略未跟踪的 `.amo-upload-uuid` 和 `AGENTS.md`）→ 确认 `CHANGELOG.md` 已有这一版的标题（没有就失败，不会改版本或签名）→ 必要时改 `manifest.json` / `package.json` 的版本并提交 → 打 `v<ver>` 标签 → 跑 `sign.sh` 向 AMO 申请 unlisted 签名 → 把签好的 xpi 复制为 `joget-skin-<ver>.xpi` → `gh release create` → 用 `scripts/gen-updates-json.mjs` 把这一版（含 sha256）合并进已有的 `updates.json`（保留历史版本）→ 用 `scripts/gen-pages.mjs` 生成安装说明和更新日志页面 → 推到 `gh-pages`（不改清单里已有版本的哈希，只追加当前版本）→ push 提交和标签。
+脚本会：确认工作区干净（忽略未跟踪的 `.amo-upload-uuid` 和 `AGENTS.md`）→ 确认 `CHANGELOG.md` 已有这一版的标题（没有就失败，不会改版本或签名）→ 必要时改 `manifest.json` / `package.json` 的版本并提交 → 打 `v<ver>` 标签 → 跑 `sign.sh` 向 AMO 申请 unlisted 签名 → 把签好的 xpi 复制为 `joget-skin-<ver>.xpi` → `gh release create` → 用 `scripts/gen-updates-json.mjs` 把这一版（含 sha256）合并进已有的 `updates.json`（保留历史版本）→ 用 `scripts/gen-pages.mjs` 生成安装说明和更新日志页面 → fetch `origin/gh-pages` 并以远端分支为基准推到 `gh-pages`（不改清单里已有版本的哈希，只追加当前版本；避免本地分支过期导致 non-fast-forward）→ push 提交和标签。
 
 装扩展：
 

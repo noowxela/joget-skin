@@ -1,6 +1,6 @@
 # Joget Skin
 
-给 [Joget](https://www.joget.org/) DX 9 用的 Firefox 扩展（个人项目）：整理 Builder / userview 界面、可选 Indigo 主题、保存提示音，以及 Process Builder 的单流程导出/导入、Userview Builder 的 UI 导出/导入。
+给 [Joget](https://www.joget.org/) DX 9 用的 Firefox 扩展（个人项目）：整理 Builder / userview 界面、可选 Indigo 主题、保存提示音，以及 Process Builder 的单流程导出/导入、Userview Builder 的 UI 导出/导入，并默认收起 Process Builder 右下角的 Canvas Controls。
 
 - Firefox 142+，gecko id `joget-skin@alexwoon`
 - 不在 AMO 公开目录上架。签名包以 unlisted 方式分发，用 Firefox 自托管更新（见 [docs/15-auto-update.md](docs/15-auto-update.md)）

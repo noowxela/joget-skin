@@ -4,6 +4,14 @@ Joget Skin 的用户可见变更，按版本从新到旧排列。日期为马来
 
 1.4.1 起可在 [GitHub Pages](https://noowxela.github.io/joget-skin/) 查看本页，也可直接阅读仓库里的这份文件。
 
+## 1.4.3 — 2026-11-22
+
+### 改进
+- Process Builder 右下角的 Canvas Controls 提示默认隐藏，不再占画布。工具栏增加按钮，可随时显示或隐藏；选择会记在 localStorage。显示时会把提示移到画布右下角，避免被右侧属性面板挡住。面板上也可以点 × 关掉。关掉皮肤后恢复 Joget 原样。
+
+### 修复
+- `release.sh` 发布 GitHub Pages 前会先 fetch `origin/gh-pages`，并以远端分支为基准提交，避免本地 `gh-pages` 过期时 push 被拒绝（non-fast-forward）。
+
 ## 1.4.2 — 2026-11-22
 
 ### 新增

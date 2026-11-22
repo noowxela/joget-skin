@@ -14,7 +14,9 @@
 # --dry-run does the local steps (version bump, commit, tag, generate
 # updates.json and the Pages HTML from a placeholder xpi) and skips anything
 # that talks to the network: AMO (sign.sh), gh release, git push, and the
-# Pages publish push.
+# Pages publish push. A real run fetches origin/gh-pages and bases the new
+# Pages commit on that tip, so a stale local gh-pages branch cannot block
+# the push.
 set -euo pipefail
 
 OWNER="noowxela"
@@ -248,10 +250,12 @@ fi
 PAGES_DIR="$WORKDIR/pages"
 if git ls-remote --exit-code "$REMOTE" "refs/heads/${PAGES_BRANCH}" >/dev/null 2>&1; then
   git fetch "$REMOTE" "$PAGES_BRANCH"
-  git worktree add "$PAGES_DIR" "${PAGES_BRANCH}" || {
-    git branch -f "$PAGES_BRANCH" FETCH_HEAD
-    git worktree add "$PAGES_DIR" "$PAGES_BRANCH"
-  }
+  # Always start from origin's tip. `git worktree add gh-pages` would use the
+  # local branch, which can lag origin and make the later push a non-fast-forward
+  # (this happened on the v1.4.2 release: local b290c79 vs origin 510c566).
+  git worktree add --detach "$PAGES_DIR" FETCH_HEAD
+  # Refresh the local branch pointer when nothing else has it checked out.
+  git branch -f "$PAGES_BRANCH" FETCH_HEAD 2>/dev/null || true
 else
   git worktree add --detach "$PAGES_DIR" HEAD
   git -C "$PAGES_DIR" checkout --orphan "$PAGES_BRANCH"
@@ -269,7 +273,7 @@ if git -C "$PAGES_DIR" diff --cached --quiet; then
   log "gh-pages already up to date"
 else
   git -C "$PAGES_DIR" commit -m "pages for v$TARGET"
-  git -C "$PAGES_DIR" push "$REMOTE" "$PAGES_BRANCH"
+  git -C "$PAGES_DIR" push "$REMOTE" "HEAD:refs/heads/${PAGES_BRANCH}"
 fi
 
 git worktree remove "$PAGES_DIR" --force

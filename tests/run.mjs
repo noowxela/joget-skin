@@ -1188,6 +1188,75 @@ test("userview copy: save in a temporary app copy then delete the app", async (p
   }
 });
 
+
+/* ---------- v1.4.3 Canvas Controls ---------- */
+test("canvas controls: hidden by default, toolbar toggles and persists, x closes, skin off restores", async (page) => {
+  await open(page, urls.process);
+  await page.waitForFunction(() => window.ProcessBuilder && ProcessBuilder.currentProcessData && ProcessBuilder.currentProcessData.properties, null, { timeout: 20000 });
+  await page.evaluate(() => localStorage.removeItem("jogetSkinCanvasControls"));
+  await page.waitForSelector("#pbuilder-controls-indicator", { timeout: 15000 });
+  await inject(page);
+  await page.waitForSelector("#jskin-cc-group", { timeout: 5000 });
+  const vis = () => page.evaluate(() => {
+    const el = document.getElementById("pbuilder-controls-indicator");
+    if (!el) return { present: false };
+    const r = el.getBoundingClientRect();
+    const display = getComputedStyle(el).display;
+    const canvas = document.getElementById("builder_canvas");
+    const c = canvas ? canvas.getBoundingClientRect() : null;
+    const inCanvas = !!(c && r.width > 0 && display !== "none"
+      && r.right <= c.right + 2 && r.left >= c.left - 2
+      && r.bottom <= c.bottom + 2 && r.top >= c.top - 2);
+    return {
+      present: true, display,
+      vis: r.width > 0 && r.height > 0 && display !== "none",
+      inCanvas,
+      w: Math.round(r.width), h: Math.round(r.height),
+      left: Math.round(r.left), top: Math.round(r.top),
+      store: localStorage.getItem("jogetSkinCanvasControls"),
+      on: document.documentElement.classList.contains("jskin-cc-on"),
+      btn: !!document.getElementById("jskin-cc-btn"),
+      x: !!document.getElementById("jskin-cc-x"),
+      pressed: (document.getElementById("jskin-cc-btn") || {}).getAttribute && document.getElementById("jskin-cc-btn").getAttribute("aria-pressed"),
+      header: (document.getElementById("pbuilder-controls-header") || {}).textContent,
+    };
+  });
+  const before = await vis();
+  assert(before.btn && !before.vis && before.display === "none" && !before.on && !before.store, "not hidden by default: " + JSON.stringify(before));
+  await shot(page, "canvasctl-closed");
+  await page.click("#jskin-cc-btn");
+  await page.waitForTimeout(300);
+  const opened = await vis();
+  assert(opened.vis && opened.inCanvas && opened.store === "1" && opened.on && opened.x && opened.pressed === "true", "did not show: " + JSON.stringify(opened));
+  await shot(page, "canvasctl-open");
+  await page.waitForFunction(() => {
+    const x = document.getElementById("jskin-cc-x");
+    if (!x) return false;
+    const r = x.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }, null, { timeout: 5000 });
+  await page.click("#jskin-cc-x");
+  await page.waitForTimeout(300);
+  const afterX = await vis();
+  assert(!afterX.vis && afterX.store === "0" && afterX.pressed === "false", "x did not hide: " + JSON.stringify(afterX));
+  await page.click("#jskin-cc-btn");
+  await page.waitForTimeout(200);
+  assert((await vis()).store === "1", "toolbar did not turn it back on");
+  await setStore(page, { jogetSkinEnabled: false });
+  await page.waitForTimeout(600);
+  const off = await vis();
+  const skin = await page.evaluate(() => document.documentElement.classList.contains("joget-skin"));
+  assert(!off.btn && off.vis && !skin, "skin off did not restore panel: " + JSON.stringify(off) + " skin=" + skin);
+  await page.evaluate(() => localStorage.removeItem("jogetSkinCanvasControls"));
+  // sessionStorage stub survives navigation; turn the skin back on or inject() never sees joget-skin
+  await setStore(page, { jogetSkinEnabled: true });
+  await open(page, urls.textForm);
+  await inject(page);
+  const onForm = await page.evaluate(() => !!document.getElementById("jskin-cc-group"));
+  assert(!onForm, "button on the form builder");
+  return `default hidden; toggle + x persist in localStorage; skin off restores Joget panel; not on form builder`;
+});
+
 /* ---------- runner ---------- */
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });

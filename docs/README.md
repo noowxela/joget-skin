@@ -19,6 +19,7 @@ Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Buil
 | `hotkeys.js` + `propcollapse.js` + `edgetoggles.js` + `pcopy-content.js` | `/jw/web/console/app/*/builder*`（含 `/builders` 和 `/process/builder`） | document_idle |
 | `pcopy-page.js` | 由 `pcopy-content.js` 用 `<script src>` 注入 Process Builder 页面（`web_accessible_resources`） | 第一次显示按钮时 |
 | `ucopy-content.js` / `ucopy-page.js` | Userview Builder 的 UI 导出/导入（只在 `.../userview/builder` 显示按钮） | 第一次显示按钮时 |
+| `canvasctl.js` | Process Builder 的 Canvas Controls 显示/隐藏（只在 `.../process/builder` 显示按钮） | document_idle |
 | `popup.html` / `popup.js` | 工具栏弹窗 | — |
 
 所有 CSS 都写在 `html.joget-skin` 之下；`content.js` 拿掉这个 class 就等于整个皮肤关掉。
@@ -40,6 +41,7 @@ Firefox MV3 扩展（gecko id `joget-skin@alexwoon`），给 Joget DX 9 的 Buil
 14. [单流程复制（导出 / 导入）](14-process-copy.md)
 15. [Firefox 自托管自动更新](15-auto-update.md)
 16. [UI / Userview 复制（导出 / 导入）](16-userview-copy.md)
+17. [隐藏 / 显示 Canvas Controls](17-canvas-controls.md)
 
 更新日志（用户可见变更，按版本排列）在仓库根目录的 [CHANGELOG.md](../CHANGELOG.md)，发布后显示在 [GitHub Pages](https://noowxela.github.io/joget-skin/)。
 
